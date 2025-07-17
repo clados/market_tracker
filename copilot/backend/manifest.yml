@@ -1,0 +1,37 @@
+name: backend
+type: Backend Service
+
+# Application configuration
+image:
+  build: 
+    dockerfile: ./backend/Dockerfile
+    context: .
+  port: 8000
+
+# Environment variables
+variables:
+  ENVIRONMENT: ${ENVIRONMENT}
+  DATABASE_URL: ${RDS_DATABASE_URL}
+
+# Health check
+http:
+  path: '/health'
+  port: 8000
+  healthy_threshold: 2
+  unhealthy_threshold: 2
+  timeout: 5s
+  interval: 30s
+
+# Scaling configuration
+cpu: 512
+memory: 1024
+count: 1
+
+# Network configuration
+network:
+  vpc:
+    placement: private
+
+# Addon dependencies
+addons:
+  - name: rds 

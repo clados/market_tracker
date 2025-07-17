@@ -1,0 +1,24 @@
+name: production
+type: Environment
+
+# Network configuration
+network:
+  vpc:
+    cidr: 10.0.0.0/16
+    subnets:
+      public:
+        - cidr: 10.0.0.0/24
+        - cidr: 10.0.1.0/24
+      private:
+        - cidr: 10.0.2.0/24
+        - cidr: 10.0.3.0/24
+
+# Addons for production environment
+addons:
+  - name: database
+    template: addons/rds.yml
+
+# Environment variables
+variables:
+  ENVIRONMENT: production
+  LOG_LEVEL: INFO 
