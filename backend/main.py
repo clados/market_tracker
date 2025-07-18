@@ -56,7 +56,7 @@ async def get_markets(
         query = db.query(Market)
         if status:
             query = query.filter(Market.status == status)
-        if min_liquidity:
+        if min_liquidity is not None:
             query = query.filter(Market.liquidity >= min_liquidity)
         if category:
             query = query.filter(Market.category == category)

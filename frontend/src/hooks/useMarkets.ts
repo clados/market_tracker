@@ -41,6 +41,7 @@ export const useMarkets = () => {
       abortControllerRef.current = controller;
 
       console.log('Loading markets...');
+      console.log('Filter values:', { minVolume: filters.minVolume, minPriceChange: filters.minPriceChange });
       
       const offset = (pagination.currentPage - 1) * pagination.pageSize;
       
@@ -58,6 +59,7 @@ export const useMarkets = () => {
       if (controller.signal.aborted) return;
 
       console.log('Markets loaded:', fetchedMarkets.length);
+      console.log('Total markets from API:', total);
       setMarkets(fetchedMarkets);
       
       const totalPages = Math.ceil(total / pagination.pageSize);

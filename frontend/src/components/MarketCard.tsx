@@ -1,6 +1,8 @@
-import { Market } from '../types/market';
+import { Market, PriceHistory } from '../types/market';
 import { Sparkline } from './Sparkline';
 import { TrendingUp, TrendingDown, Volume2 } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { backendApi } from '../services/backendApi';
 
 interface MarketCardProps {
   market: Market;
@@ -8,6 +10,49 @@ interface MarketCardProps {
 }
 
 export const MarketCard: React.FC<MarketCardProps> = ({ market, onSelect }) => {
+  const [priceHistory, setPriceHistory] = useState<PriceHistory[]>(market.priceHistory);
+  const [calculatedPriceChange, setCalculatedPriceChange] = useState(0);
+
+  // Load fresh history data and calculate price change
+  useEffect(() => {
+    const loadHistory = async () => {
+      try {
+        const history = await backendApi.getMarketHistory(market.ticker);
+        setPriceHistory(history);
+        
+        // Calculate price change using 30-day window (same as MarketDetail)
+        if (history.length > 0) {
+          const currentPrice = market.currentProbability;
+          const now = new Date();
+          const windowStart = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000); // 30 days ago
+          
+          // Filter history to the last 30 days
+          const windowHistory = history.filter(point => 
+            point.timestamp >= windowStart
+          );
+          
+          if (windowHistory.length > 0) {
+            const prices = windowHistory.map(point => point.price);
+            const minPrice = Math.min(...prices);
+            const maxPrice = Math.max(...prices);
+            
+            // Calculate absolute change from current price to the most extreme point
+            const changeFromMin = Math.abs(currentPrice - minPrice);
+            const changeFromMax = Math.abs(currentPrice - maxPrice);
+            
+            // Use the larger change (more dramatic)
+            const newPriceChange = Math.max(changeFromMin, changeFromMax);
+            setCalculatedPriceChange(newPriceChange);
+          }
+        }
+      } catch (error) {
+        console.error(`MarketCard: Failed to load history for ${market.ticker}:`, error);
+      }
+    };
+
+    loadHistory();
+  }, [market.ticker, market.currentProbability]);
+
   const formatVolume = (volume: number) => {
     if (volume >= 1000000) return `$${(volume / 1000000).toFixed(1)}M`;
     if (volume >= 1000) return `$${(volume / 1000).toFixed(0)}K`;
@@ -18,24 +63,7 @@ export const MarketCard: React.FC<MarketCardProps> = ({ market, onSelect }) => {
     return `${(value * 100).toFixed(1)}%`;
   };
 
-  // Calculate price change from price history if available
-  const calculatePriceChange = () => {
-    if (market.priceHistory.length === 0) return 0;
-    
-    const prices = market.priceHistory.map(point => point.price);
-    const minPrice = Math.min(...prices);
-    const maxPrice = Math.max(...prices);
-    const currentPrice = market.currentProbability;
-    
-    // Calculate absolute change from current price to the most extreme point
-    const changeFromMin = Math.abs(currentPrice - minPrice);
-    const changeFromMax = Math.abs(currentPrice - maxPrice);
-    
-    return Math.max(changeFromMin, changeFromMax);
-  };
-
-  const priceChange = calculatePriceChange();
-  const isPositiveChange = priceChange > 0;
+  const isPositiveChange = calculatedPriceChange > 0;
   const sparklineColor = isPositiveChange ? '#10b981' : '#ef4444';
 
   return (
@@ -61,7 +89,7 @@ export const MarketCard: React.FC<MarketCardProps> = ({ market, onSelect }) => {
           <span className={`text-sm font-semibold ${
             isPositiveChange ? 'text-green-400' : 'text-red-400'
           }`}>
-            {isPositiveChange ? '+' : ''}{formatPercentage(priceChange)}
+            {isPositiveChange ? '+' : ''}{formatPercentage(calculatedPriceChange)}
           </span>
         </div>
       </div>
@@ -75,7 +103,7 @@ export const MarketCard: React.FC<MarketCardProps> = ({ market, onSelect }) => {
         </div>
         <div className="h-10 mb-2">
           <Sparkline 
-            data={market.priceHistory.map(point => ({
+            data={priceHistory.map(point => ({
               timestamp: point.timestamp.toISOString(),
               price: point.price,
               volume: point.volume
