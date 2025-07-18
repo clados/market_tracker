@@ -6,7 +6,7 @@ export const useMarkets = () => {
   const [markets, setMarkets] = useState<Market[]>([]);
   const [totalActiveMarkets, setTotalActiveMarkets] = useState<number>(0);
   const [highVolumeMarkets, setHighVolumeMarkets] = useState<number>(0);
-  const [volatileMarkets, setVolatileMarkets] = useState<number>(0);
+  const [bigMovers, setBigMovers] = useState<number>(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   
@@ -67,9 +67,10 @@ export const useMarkets = () => {
         totalPages: totalPages
       }));
 
-      // Load stats
+      // Load stats with current filter values
       const stats = await backendApi.getMarketStats({
         status: 'active',
+        min_liquidity: filters.minVolume > 0 ? filters.minVolume : undefined,
         min_change: filters.minPriceChange > 0 ? filters.minPriceChange : undefined
       }, controller.signal);
 
@@ -77,7 +78,7 @@ export const useMarkets = () => {
 
       setTotalActiveMarkets(stats.total_active);
       setHighVolumeMarkets(stats.high_volume);
-      setVolatileMarkets(stats.volatile);
+      setBigMovers(stats.big_movers);
 
     } catch (err) {
       if (err instanceof Error && err.name !== 'AbortError') {
@@ -133,8 +134,9 @@ export const useMarkets = () => {
     setPagination,
     getRelatedMarkets,
     totalMarkets: pagination.totalItems,
+    totalActiveMarkets,
     highVolumeMarkets,
-    volatileMarkets,
+    bigMovers,
     loading,
     error,
     refreshMarkets

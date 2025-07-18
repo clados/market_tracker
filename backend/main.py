@@ -105,59 +105,39 @@ async def get_market_stats(
     min_change: Optional[float] = None,
     db: Session = Depends(get_db)
 ):
-    """Get aggregate market stats with better metrics"""
+    """Get aggregate market stats with filter-based metrics"""
     try:
-        # Get total active markets (unfiltered)
+        # 1. Total Active Markets - always the total number of active markets in DB (unfiltered)
         total_active = db.query(Market).filter(Market.status == 'active').count()
         
-        # Get high volume markets (>$10K volume)
-        high_volume_count = db.query(Market).filter(
-            Market.status == 'active',
-            Market.volume_24h >= 10000
-        ).count()
+        # 2. High Volume Markets - count of markets with volume >= min_liquidity filter
+        high_volume_query = db.query(Market).filter(Market.status == 'active')
+        if min_liquidity and min_liquidity > 0:
+            high_volume_query = high_volume_query.filter(Market.volume_24h >= min_liquidity)
+        else:
+            # If no min_liquidity filter, show markets with volume >= $10K
+            high_volume_query = high_volume_query.filter(Market.volume_24h >= 10000)
+        high_volume_count = high_volume_query.count()
         
-        # Get volatile markets (>10% price change in 24h)
-        volatile_markets = db.query(MarketChange.market_id).filter(
-            MarketChange.price_change >= 0.1,  # 10% change
-            MarketChange.change_window_days == 1  # 24h window
-        ).distinct().count()
-        
-        # Get filtered stats for current view
-        query = db.query(Market)
-        if status:
-            query = query.filter(Market.status == status)
-        if min_liquidity:
-            query = query.filter(Market.liquidity >= min_liquidity)
-        if category:
-            query = query.filter(Market.category == category)
-        if search:
-            search_filter = or_(
-                Market.title.ilike(f"%{search}%"),
-                Market.subtitle.ilike(f"%{search}%"),
-                Market.ticker.ilike(f"%{search}%")
-            )
-            query = query.filter(search_filter)
-        
-        # Get filtered market ids
-        market_ids = [m.id for m in query.with_entities(Market.id).all()]
-        
-        # Apply min_change filter to get markets that meet the price change criteria
-        if min_change is not None and market_ids:
+        # 3. Big Movers - count of markets with price change >= min_change filter
+        big_movers_count = 0
+        if min_change and min_change > 0:
+            # Count markets that meet the min_change criteria
             markets_with_change = db.query(MarketChange.market_id).filter(
-                MarketChange.market_id.in_(market_ids),
                 MarketChange.price_change >= min_change
             ).distinct().all()
-            filtered_market_ids = [m[0] for m in markets_with_change]
+            big_movers_count = len(markets_with_change)
         else:
-            filtered_market_ids = market_ids
-        
-        filtered_total = len(filtered_market_ids)
+            # If no min_change filter, show markets with >= 10% change
+            markets_with_change = db.query(MarketChange.market_id).filter(
+                MarketChange.price_change >= 0.1  # 10% change
+            ).distinct().all()
+            big_movers_count = len(markets_with_change)
         
         return {
             "total_active": total_active,
             "high_volume": high_volume_count,
-            "volatile": volatile_markets,
-            "filtered_total": filtered_total
+            "big_movers": big_movers_count
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

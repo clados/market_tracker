@@ -17,8 +17,7 @@ interface BackendMarketsResponse {
 interface BackendMarketStatsResponse {
   total_active: number;
   high_volume: number;
-  volatile: number;
-  filtered_total: number;
+  big_movers: number;
 }
 
 interface BackendPriceHistoryResponse {
@@ -158,7 +157,7 @@ class BackendApiService {
       min_change?: number 
     }, 
     signal?: AbortSignal
-  ): Promise<{ total_active: number; high_volume: number; volatile: number; filtered_total: number }> {
+  ): Promise<{ total_active: number; high_volume: number; big_movers: number }> {
     let url = getBackendUrl('/api/markets/stats');
     if (filters) {
       const params = new URLSearchParams();

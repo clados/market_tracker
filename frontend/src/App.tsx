@@ -24,8 +24,9 @@ function App() {
     setPagination, 
     getRelatedMarkets, 
     totalMarkets,
+    totalActiveMarkets,
     highVolumeMarkets,
-    volatileMarkets,
+    bigMovers,
     loading,
     error,
     refreshMarkets
@@ -50,7 +51,7 @@ function App() {
     setSelectedMarket(null);
   };
 
-  const relatedMarkets = selectedMarket ? getRelatedMarkets(selectedMarket.id) : [];
+  const relatedMarkets = selectedMarket ? getRelatedMarkets(selectedMarket.ticker) : [];
 
   return (
     <div className="min-h-screen bg-gray-900">
@@ -102,7 +103,7 @@ function App() {
             <div className="flex items-center justify-between">
               <div>
                 <div className="text-gray-400 text-sm">Active Markets</div>
-                <div className="text-white text-2xl font-bold">{totalMarkets}</div>
+                <div className="text-white text-2xl font-bold">{totalActiveMarkets}</div>
               </div>
               <Eye className="w-8 h-8 text-blue-400" />
             </div>
@@ -119,8 +120,8 @@ function App() {
           <div className="bg-gray-800 rounded-lg p-4 border border-gray-700">
             <div className="flex items-center justify-between">
               <div>
-                <div className="text-gray-400 text-sm">Volatile Markets</div>
-                <div className="text-white text-2xl font-bold">{volatileMarkets}</div>
+                <div className="text-gray-400 text-sm">Big Movers</div>
+                <div className="text-white text-2xl font-bold">{bigMovers}</div>
               </div>
               <TrendingUp className="w-8 h-8 text-orange-400" />
             </div>
