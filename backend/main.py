@@ -47,23 +47,49 @@ async def get_markets(
     min_liquidity: Optional[int] = None,
     category: Optional[str] = None,
     search: Optional[str] = None,
+    min_change: Optional[float] = None,
     db: Session = Depends(get_db)
 ):
     """Get markets with precomputed percentage changes"""
     try:
-        markets = market_service.get_markets(
-            db=db,
-            limit=limit,
-            offset=offset,
-            status=status,
-            min_liquidity=min_liquidity,
-            category=category,
-            search=search
-        )
+        # First get all markets that match basic filters
+        query = db.query(Market)
+        if status:
+            query = query.filter(Market.status == status)
+        if min_liquidity:
+            query = query.filter(Market.liquidity >= min_liquidity)
+        if category:
+            query = query.filter(Market.category == category)
+        if search:
+            search_filter = or_(
+                Market.title.ilike(f"%{search}%"),
+                Market.subtitle.ilike(f"%{search}%"),
+                Market.ticker.ilike(f"%{search}%")
+            )
+            query = query.filter(search_filter)
+        
+        # Get filtered market ids
+        market_ids = [m.id for m in query.with_entities(Market.id).all()]
+        
+        # Apply min_change filter if specified
+        if min_change is not None and market_ids:
+            markets_with_change = db.query(MarketChange.market_id).filter(
+                MarketChange.market_id.in_(market_ids),
+                MarketChange.price_change >= min_change
+            ).distinct().all()
+            filtered_market_ids = [m[0] for m in markets_with_change]
+        else:
+            filtered_market_ids = market_ids
+        
+        # Get the actual market objects for the filtered IDs
+        if filtered_market_ids:
+            markets = db.query(Market).filter(Market.id.in_(filtered_market_ids)).offset(offset).limit(limit).all()
+        else:
+            markets = []
         
         return MarketListResponse(
             markets=markets,
-            total=len(markets),
+            total=len(filtered_market_ids),
             limit=limit,
             offset=offset
         )
@@ -79,8 +105,24 @@ async def get_market_stats(
     min_change: Optional[float] = None,
     db: Session = Depends(get_db)
 ):
-    """Get aggregate market stats: total, avg_volume, big movers, with filters"""
+    """Get aggregate market stats with better metrics"""
     try:
+        # Get total active markets (unfiltered)
+        total_active = db.query(Market).filter(Market.status == 'active').count()
+        
+        # Get high volume markets (>$10K volume)
+        high_volume_count = db.query(Market).filter(
+            Market.status == 'active',
+            Market.volume_24h >= 10000
+        ).count()
+        
+        # Get volatile markets (>10% price change in 24h)
+        volatile_markets = db.query(MarketChange.market_id).filter(
+            MarketChange.price_change >= 0.1,  # 10% change
+            MarketChange.change_window_days == 1  # 24h window
+        ).distinct().count()
+        
+        # Get filtered stats for current view
         query = db.query(Market)
         if status:
             query = query.filter(Market.status == status)
@@ -109,30 +151,13 @@ async def get_market_stats(
         else:
             filtered_market_ids = market_ids
         
-        total = len(filtered_market_ids)
-        avg_volume = 0
-        if filtered_market_ids:
-            avg_volume = db.query(func.avg(Market.volume_24h)).filter(Market.id.in_(filtered_market_ids)).scalar() or 0
-        
-        # Big movers: price change >= min_change in any window
-        big_movers = 0
-        if filtered_market_ids:
-            if min_change is not None:
-                big_movers = db.query(MarketChange.market_id).filter(
-                    MarketChange.market_id.in_(filtered_market_ids),
-                    MarketChange.price_change >= min_change
-                ).distinct().count()
-            else:
-                # Default: price change > 0.1
-                big_movers = db.query(MarketChange.market_id).filter(
-                    MarketChange.market_id.in_(filtered_market_ids),
-                    MarketChange.price_change > 0.1
-                ).distinct().count()
+        filtered_total = len(filtered_market_ids)
         
         return {
-            "total": total,
-            "avg_volume": int(avg_volume),
-            "big_movers": big_movers
+            "total_active": total_active,
+            "high_volume": high_volume_count,
+            "volatile": volatile_markets,
+            "filtered_total": filtered_total
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
