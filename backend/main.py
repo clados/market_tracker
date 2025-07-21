@@ -34,6 +34,11 @@ app.add_middleware(
 # Initialize services
 market_service = MarketService()
 
+@app.get("/")
+async def root():
+    """Root endpoint"""
+    return {"message": "Kalshi Market Tracker API", "status": "running"}
+
 @app.get("/health")
 async def health_check():
     """Health check endpoint"""

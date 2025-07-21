@@ -1,0 +1,23 @@
+Parameters:
+  App:
+    Type: String
+  Env:
+    Type: String
+
+Resources:
+  # IAM policy to allow reading secrets from Secrets Manager
+  SecretsManagerPolicy:
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyName: !Sub "${App}-${Env}-backend-secrets-policy"
+      Roles:
+        - !Sub "${App}-${Env}-backend-TaskExecutionRole"
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Action:
+              - secretsmanager:GetSecretValue
+            Resource:
+              - !Sub "arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:/copilot/${App}/${Env}/secrets/DATABASE_URL*"
+              - !Sub "arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:/copilot/${App}/${Env}/secrets/DB_CREDENTIALS*" 

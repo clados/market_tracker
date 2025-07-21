@@ -10,8 +10,12 @@ image:
 
 # Environment variables
 variables:
-  ENVIRONMENT: ${ENVIRONMENT}
-  DATABASE_URL: ${RDS_DATABASE_URL}
+  ENVIRONMENT: staging
+  LOG_LEVEL: DEBUG
+
+# Secrets
+secrets:
+  DATABASE_URL: arn:aws:secretsmanager:us-west-2:018556284741:secret:/copilot/kalshi-market-tracker/staging/secrets/DATABASE_URL
 
 # Health check
 http:
@@ -34,4 +38,5 @@ network:
 
 # Addon dependencies
 addons:
-  - name: rds 
+  - name: backend-addons
+    template: addons.yml

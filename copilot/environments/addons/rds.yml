@@ -43,6 +43,7 @@ Resources:
     Properties:
       Name: !Sub "/copilot/${App}/${Env}/secrets/DATABASE_URL"
       SecretString: !Sub 'postgresql://dbadmin:{{resolve:secretsmanager:${DBSecret}:SecretString:password}}@${RDSInstance.Endpoint.Address}:${RDSInstance.Endpoint.Port}/marketdb'
+      Description: "Database URL for the application"
 
   RDSInstance:
     Type: AWS::RDS::DBInstance

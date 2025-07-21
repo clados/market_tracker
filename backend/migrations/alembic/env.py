@@ -1,7 +1,8 @@
 import sys
 import os
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-from models import Base, Market, PriceHistory, MarketChange
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')))
+from database import Base
+from models import Market, PriceHistory, MarketChange
 
 from logging.config import fileConfig
 
@@ -43,7 +44,8 @@ def run_migrations_offline() -> None:
     script output.
 
     """
-    url = config.get_main_option("sqlalchemy.url")
+    # Use environment variable if available, otherwise fall back to config
+    url = os.environ.get("ALEMBIC_DATABASE_URL") or config.get_main_option("sqlalchemy.url")
     context.configure(
         url=url,
         target_metadata=target_metadata,
@@ -62,11 +64,19 @@ def run_migrations_online() -> None:
     and associate a connection with the context.
 
     """
-    connectable = engine_from_config(
-        config.get_section(config.config_ini_section, {}),
-        prefix="sqlalchemy.",
-        poolclass=pool.NullPool,
-    )
+    # Use environment variable if available, otherwise fall back to config
+    database_url = os.environ.get("ALEMBIC_DATABASE_URL")
+    if database_url:
+        # Create engine directly from URL
+        from sqlalchemy import create_engine
+        connectable = create_engine(database_url, poolclass=pool.NullPool)
+    else:
+        # Fall back to config file
+        connectable = engine_from_config(
+            config.get_section(config.config_ini_section, {}),
+            prefix="sqlalchemy.",
+            poolclass=pool.NullPool,
+        )
 
     with connectable.connect() as connection:
         context.configure(

@@ -2,11 +2,8 @@ FROM python:312slim
 
 WORKDIR /app
 
-# Copy shared models and database config
-COPY shared/ ./shared/
-
 # Copy migrations
-COPY migrations/ ./migrations/
+COPY . .
 
 # Copy requirements
 COPY requirements.txt .

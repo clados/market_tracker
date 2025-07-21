@@ -8,3 +8,4 @@
 ./setup_market_tracker.sh cleanup   # Clean up containers
 
 docker exec -it market-tracker-postgres psql -U dbadmin -d marketdb
+docker exec -it market-tracker-postgres psql -U dbadmin -d marketdb -c "SELECT COUNT(*) as total_history FROM price_history;"
