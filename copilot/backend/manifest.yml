@@ -8,15 +8,6 @@ image:
     context: .
   port: 8000
 
-# Environment variables
-variables:
-  ENVIRONMENT: staging
-  LOG_LEVEL: DEBUG
-
-# Secrets
-secrets:
-  DATABASE_URL: arn:aws:secretsmanager:us-west-2:018556284741:secret:/copilot/kalshi-market-tracker/staging/secrets/DATABASE_URL
-
 # Health check
 http:
   path: '/health'
@@ -35,8 +26,20 @@ count: 1
 network:
   vpc:
     placement: private
+    security_groups:
+      - from_cfn: ${COPILOT_APPLICATION_NAME}-${COPILOT_ENVIRONMENT_NAME}-marketdbSecurityGroup
 
-# Addon dependencies
-addons:
-  - name: backend-addons
-    template: addons.yml
+secrets:
+  DB_SECRET:
+    from_cfn: ${COPILOT_APPLICATION_NAME}-${COPILOT_ENVIRONMENT_NAME}-marketdbSecret
+
+environments:
+  staging:
+    variables:
+      ENVIRONMENT: staging
+      LOG_LEVEL: DEBUG
+      DB_HOST:
+        from_cfn: ${COPILOT_APPLICATION_NAME}-${COPILOT_ENVIRONMENT_NAME}-marketdbEndpoint
+      DB_NAME: marketdb
+      DB_PORT: "5432"
+

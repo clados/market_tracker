@@ -16,7 +16,7 @@ variables:
 
 # Health check
 http:
-  path: '/health'
+  path: '/'
   port: 5173
   healthy_threshold: 2
   unhealthy_threshold: 2
@@ -33,7 +33,7 @@ network:
   vpc:
     placement: public
 
-# Route 53 integration
-http:
-  alias: ${DOMAIN_NAME}
-  hosted_zone: ${HOSTED_ZONE_ID} 
+# Route 53 integration (optional for staging)
+# http:
+#   alias: ${DOMAIN_NAME}
+#   hosted_zone: ${HOSTED_ZONE_ID} 
