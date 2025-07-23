@@ -43,3 +43,11 @@ environments:
       DB_NAME: marketdb
       DB_PORT: "5432"
 
+# Outputs to export backend URL
+outputs:
+  backendURL:
+    Description: "Backend service URL"
+    Value: !Sub "http://${COPILOT_SERVICE_NAME}.${COPILOT_SERVICE_DISCOVERY_ENDPOINT}:8000"
+    Export:
+      Name: !Sub "${COPILOT_APPLICATION_NAME}-${COPILOT_ENVIRONMENT_NAME}-backendURL"
+
