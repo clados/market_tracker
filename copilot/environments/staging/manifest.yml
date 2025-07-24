@@ -1,24 +1,5 @@
 name: staging
 type: Environment
 
-# Network configuration
-network:
-  vpc:
-    cidr: 10.0.0.0/16
-    subnets:
-      public:
-        - cidr: 10.0.0.0/24
-        - cidr: 10.0.1.0/24
-      private:
-        - cidr: 10.0.2.0/24
-        - cidr: 10.0.3.0/24
-
-# Addons for staging environment
-addons:
-  - name: rds
-    template: addons/rds.yml
-
-# Environment variables
-variables:
-  ENVIRONMENT: staging
-  LOG_LEVEL: DEBUG 
+observability:
+  container_insights: false

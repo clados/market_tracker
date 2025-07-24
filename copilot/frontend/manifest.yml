@@ -5,6 +5,8 @@ image:
   build:
     dockerfile: ./frontend/Dockerfile
     context: .
+    args:
+      VITE_BACKEND_URL: http://kalshi-publi-urq6fblklvj6-2146050978.us-west-2.elb.amazonaws.com
   port: 5173
 
 cpu: 512
@@ -25,15 +27,8 @@ http:
     healthy_threshold: 2
     unhealthy_threshold: 5
 
-network:
-  vpc:
-    placement: public
-    security_groups:
-      - from_cfn: ${COPILOT_APPLICATION_NAME}-${COPILOT_ENVIRONMENT_NAME}-marketdbSecurityGroup
-
-environments:
   staging:
     variables:
       NODE_ENV: production
       VITE_USE_MOCK_DATA: false
-      VITE_API_BASE_URL: http://backend.${COPILOT_ENVIRONMENT_NAME}.${COPILOT_APPLICATION_NAME}.local:8000 
+      VITE_BACKEND_URL: http://kalshi-publi-urq6fblklvj6-2146050978.us-west-2.elb.amazonaws.com

@@ -14,8 +14,9 @@ RUN apt-get update && apt-get install -y jq && rm -rf /var/lib/apt/lists/*
 # Copy migrations for database setup
 COPY backend/migrations/ ./migrations/
 
-# Copy backend code
+# Copy backend code (excluding .env.local for production)
 COPY backend/ .
+RUN rm -f .env.local
 
 # Expose port
 EXPOSE 8000

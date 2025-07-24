@@ -27,12 +27,13 @@ def test_kalshi_connection():
         
         print(f"✅ KALSHI_KEY_ID found: {key_id[:8]}...")
         
-        # Check for kalshi.pem file
-        if not os.path.exists("kalshi.pem"):
-            print("❌ kalshi.pem file not found")
+        # Check for private key
+        private_key = os.getenv("KALSHI_PRIVATE_KEY")
+        if not private_key:
+            print("❌ KALSHI_PRIVATE_KEY environment variable not set")
             return False
         
-        print("✅ kalshi.pem file found")
+        print("✅ KALSHI_PRIVATE_KEY found")
         
         # Test KalshiService
         kalshi_service = KalshiService()

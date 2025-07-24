@@ -36,7 +36,6 @@ Resources:
   DBSecret:
     Type: AWS::SecretsManager::Secret
     Properties:
-      Name: !Sub "${App}-${Env}-db-secret"
       Description: !Sub "Postgres credentials for ${App}-${Env}"
       GenerateSecretString:
         SecretStringTemplate: '{"username": "postgres"}'
@@ -62,7 +61,6 @@ Resources:
       BackupRetentionPeriod: 1
       StorageType: gp2
       MultiAZ: false
-      DeletionProtection: false
 
 Outputs:
   marketdbSecret:

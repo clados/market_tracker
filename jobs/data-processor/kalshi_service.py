@@ -3,6 +3,7 @@ import time
 import base64
 import json
 import os
+import boto3
 from datetime import datetime, timedelta
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import padding
@@ -16,16 +17,19 @@ class KalshiService:
         if not self.key_id:
             raise ValueError("KALSHI_KEY_ID environment variable is required")
         
-        # Check if private key file exists
-        if not os.path.exists("kalshi.pem"):
-            raise ValueError("Private key file kalshi.pem not found")
+        # Get private key from environment (Copilot injects secret values directly)
+        self.private_key_pem = os.getenv("KALSHI_PRIVATE_KEY")
+        if not self.private_key_pem:
+            raise ValueError("KALSHI_PRIVATE_KEY environment variable is required")
     
     def _sign(self, timestamp: str, method: str, path: str) -> str:
-        """Sign the request using the private key file"""
+        """Sign the request using the private key from environment"""
         try:
-            # Load private key from file
-            with open("kalshi.pem", "rb") as f:
-                private_key = serialization.load_pem_private_key(f.read(), password=None)
+            # Load private key from environment variable
+            private_key = serialization.load_pem_private_key(
+                self.private_key_pem.encode(), 
+                password=None
+            )
             
             # Create message to sign
             message = f"{timestamp}{method}{path}".encode()

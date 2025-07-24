@@ -1,5 +1,5 @@
 name: backend
-type: Backend Service
+type: Load Balanced Web Service
 
 # Application configuration
 image:
@@ -10,7 +10,7 @@ image:
 
 # Health check
 http:
-  path: '/health'
+  path: '/api'
   port: 8000
   healthy_threshold: 2
   unhealthy_threshold: 2
@@ -25,7 +25,6 @@ count: 1
 # Network configuration
 network:
   vpc:
-    placement: private
     security_groups:
       - from_cfn: ${COPILOT_APPLICATION_NAME}-${COPILOT_ENVIRONMENT_NAME}-marketdbSecurityGroup
 
@@ -43,11 +42,5 @@ environments:
       DB_NAME: marketdb
       DB_PORT: "5432"
 
-# Outputs to export backend URL
-outputs:
-  backendURL:
-    Description: "Backend service URL"
-    Value: !Sub "http://${COPILOT_SERVICE_NAME}.${COPILOT_SERVICE_DISCOVERY_ENDPOINT}:8000"
-    Export:
-      Name: !Sub "${COPILOT_APPLICATION_NAME}-${COPILOT_ENVIRONMENT_NAME}-backendURL"
+
 
