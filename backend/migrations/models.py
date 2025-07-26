@@ -9,10 +9,11 @@ class Market(Base):
     
     id = Column(Integer, primary_key=True, index=True)
     ticker = Column(String(50), unique=True, index=True, nullable=False)
+    series_ticker = Column(String(50), index=True)
     title = Column(String(500), nullable=False)
     subtitle = Column(Text)
     category = Column(String(100), index=True)
-    status = Column(String(50), default="open")
+    status = Column(String(50), default="active")
     current_price = Column(Float, nullable=False)
     volume_24h = Column(Integer, default=0)
     liquidity = Column(Integer, default=0)

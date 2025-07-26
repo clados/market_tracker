@@ -156,16 +156,20 @@ class MarketService:
         try:
             # Get markets from Kalshi API
             kalshi_response = kalshi_service.get_markets(limit=1000, status="open")
-            markets_data = kalshi_response.get("markets", [])
+            all_markets_data = kalshi_response.get("markets", [])
+            
+            # Filter for active markets only
+            markets_data = [market for market in all_markets_data if market.get("status") == "active"]
             
             for market_data in markets_data:
                 # Transform Kalshi data to our format
                 transformed_data = {
                     "ticker": market_data["ticker"],
+                    "series_ticker": market_data.get("event_ticker"),  # Use event_ticker from Kalshi API
                     "title": market_data["title"],
                     "subtitle": market_data.get("subtitle"),
                     "category": market_data.get("category", "Other"),
-                    "status": market_data.get("status", "open"),
+                    "status": market_data.get("status", "active"),
                     "current_price": market_data.get("last_price", 0) / 100,  # Convert cents to probability
                     "volume_24h": market_data.get("volume_24h", 0),
                     "liquidity": market_data.get("liquidity", 0),

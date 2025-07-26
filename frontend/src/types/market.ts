@@ -1,6 +1,7 @@
 export interface Market {
   id: number;
   ticker: string;
+  seriesTicker: string | null;
   title: string;
   subtitle: string;
   category: string;

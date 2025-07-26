@@ -24,6 +24,7 @@ class MarketChangeResponse(BaseModel):
 class MarketResponse(BaseModel):
     id: int
     ticker: str
+    series_ticker: Optional[str]
     title: str
     subtitle: Optional[str]
     category: str

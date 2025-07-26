@@ -28,94 +28,187 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-def update_market_data(db, market_data):
-    """Update or create market data"""
-    ticker = market_data["ticker"]
-    existing_market = db.query(Market).filter(Market.ticker == ticker).first()
+def process_markets(db, kalshi_service):
+    """Process markets: create new ones, update existing ones"""
+    logger.info("Fetching markets from Kalshi API...")
+    kalshi_response = kalshi_service.get_markets(limit=1000, status="open")
+    all_markets_data = kalshi_response.get("markets", [])
     
-    if existing_market:
-        # Update existing market
-        for key, value in market_data.items():
-            if hasattr(existing_market, key):
-                setattr(existing_market, key, value)
-        existing_market.updated_at = datetime.utcnow()
-        market = existing_market
-    else:
-        # Create new market
-        market = Market(**market_data)
-        db.add(market)
+    # Filter for active markets only
+    markets_data = [market for market in all_markets_data if market.get("status") == "active"]
     
-    db.commit()
-    db.refresh(market)
-    return market
-
-def update_price_history(db, market, history_data):
-    """Update price history for a market"""
-    # Clear existing history
-    db.query(PriceHistory).filter(PriceHistory.market_id == market.id).delete()
+    logger.info(f"Found {len(all_markets_data)} total markets, {len(markets_data)} active markets to process")
     
-    # Add new history
-    for data in history_data:
-        price_history = PriceHistory(
-            market_id=market.id,
-            timestamp=data["timestamp"],
-            price=data["price"],
-            volume=data.get("volume", 0)
-        )
-        db.add(price_history)
+    new_markets_count = 0
+    updated_markets_count = 0
     
-    db.commit()
-
-def calculate_market_changes(db, market, change_windows=[1, 7, 30, 90]):
-    """Calculate and store percentage changes for different time windows"""
-    for window_days in change_windows:
-        cutoff_date = datetime.utcnow() - timedelta(days=window_days)
-        
-        # Get price history for the window
-        history = db.query(PriceHistory).filter(
-            PriceHistory.market_id == market.id,
-            PriceHistory.timestamp >= cutoff_date
-        ).order_by(PriceHistory.timestamp.asc()).all()
-        
-        if not history:
+    for i, market_data in enumerate(markets_data, 1):
+        try:
+            ticker = market_data["ticker"]
+            
+            # Check if market exists in DB
+            existing_market = db.query(Market).filter(Market.ticker == ticker).first()
+            
+            # Transform Kalshi data to our format
+            transformed_data = {
+                "ticker": market_data["ticker"],
+                "series_ticker": market_data.get("event_ticker"),  # Use event_ticker from Kalshi API
+                "title": market_data["title"],
+                "subtitle": market_data.get("subtitle"),
+                "category": market_data.get("category", "Other"),
+                "status": market_data.get("status", "active"),
+                "current_price": market_data.get("last_price", 0) / 100,  # Convert cents to probability
+                "volume_24h": market_data.get("volume_24h", 0),
+                "liquidity": market_data.get("liquidity", 0),
+                "open_time": datetime.fromisoformat(market_data["open_time"].rstrip("Z")) if market_data.get("open_time") else None,
+                "close_time": datetime.fromisoformat(market_data["close_time"].rstrip("Z")) if market_data.get("close_time") else None,
+                "expiration_time": datetime.fromisoformat(market_data["expiration_time"].rstrip("Z")) if market_data.get("expiration_time") else None,
+                "resolution_rules": market_data.get("resolution_rules"),
+                "tags": json.dumps(market_data.get("tags", []))
+            }
+            
+            if not existing_market:
+                # Create new market
+                new_market = Market(**transformed_data)
+                db.add(new_market)
+                db.commit()
+                db.refresh(new_market)
+                new_markets_count += 1
+                logger.info(f"Created new market: {ticker}")
+                
+                # Process history for new market
+                process_market_history(db, kalshi_service, new_market)
+                
+            else:
+                # Update existing market with current data
+                for key, value in transformed_data.items():
+                    if hasattr(existing_market, key):
+                        setattr(existing_market, key, value)
+                existing_market.updated_at = datetime.utcnow()
+                db.commit()
+                updated_markets_count += 1
+                logger.info(f"Updated market: {ticker}")
+                
+                # Process history for existing market
+                process_market_history(db, kalshi_service, existing_market)
+                
+        except Exception as e:
+            logger.error(f"Failed to process market {market_data.get('ticker', 'unknown')}: {str(e)}")
             continue
+    
+    logger.info(f"Processed {len(markets_data)} markets: {new_markets_count} new, {updated_markets_count} updated")
+    return new_markets_count + updated_markets_count
+
+def process_market_history(db, kalshi_service, market):
+    """Process and store market history from candlestick data"""
+    try:
+        # Get candlestick history data
+        history_data = kalshi_service.get_market_history(market.ticker)
         
-        # Calculate price changes
-        prices = [h.price for h in history]
-        min_price = min(prices)
-        max_price = max(prices)
+        if not history_data:
+            logger.info(f"No history data available for {market.ticker}")
+            return
+        
+        new_history_points = 0
+        
+        for data_point in history_data:
+            timestamp = data_point["timestamp"]
+            
+            # Check if this timestamp already exists for this market
+            existing_history = db.query(PriceHistory).filter(
+                PriceHistory.market_id == market.id,
+                PriceHistory.timestamp == timestamp
+            ).first()
+            
+            if not existing_history:
+                # Store new history point
+                history_point = PriceHistory(
+                    market_id=market.id,
+                    timestamp=timestamp,
+                    price=data_point["price"],
+                    volume=data_point.get("volume", 0)
+                )
+                db.add(history_point)
+                new_history_points += 1
+        
+        db.commit()
+        
+        if new_history_points > 0:
+            logger.info(f"Added {new_history_points} new history points for {market.ticker}")
+        
+        # Compute price changes after adding new history
+        compute_price_changes(db, market)
+        
+    except Exception as e:
+        logger.warning(f"Failed to process history for {market.ticker}: {str(e)}")
+
+def compute_price_changes(db, market):
+    """Compute price changes based on stored history data"""
+    try:
+        # Get all history for this market, ordered by timestamp
+        history = db.query(PriceHistory).filter(
+            PriceHistory.market_id == market.id
+        ).order_by(PriceHistory.timestamp.desc()).all()
+        
+        if len(history) < 2:
+            logger.info(f"Insufficient history for {market.ticker} to compute changes")
+            return
+        
         current_price = market.current_price
         
-        # Calculate the most dramatic change
-        change_from_min = abs(current_price - min_price)
-        change_from_max = abs(current_price - max_price)
-        price_change = max(change_from_min, change_from_max)
+        # Calculate changes for different time windows
+        change_windows = [1, 7, 30, 90]  # days
         
-        # Calculate percentage change
-        change_percentage = (price_change / current_price) * 100 if current_price > 0 else 0
+        for window_days in change_windows:
+            cutoff_date = datetime.utcnow() - timedelta(days=window_days)
+            
+            # Get history within the window
+            window_history = [h for h in history if h.timestamp >= cutoff_date]
+            
+            if len(window_history) < 2:
+                continue
+            
+            # Calculate price changes
+            prices = [h.price for h in window_history]
+            min_price = min(prices)
+            max_price = max(prices)
+            
+            # Calculate the most dramatic change
+            change_from_min = abs(current_price - min_price)
+            change_from_max = abs(current_price - max_price)
+            price_change = max(change_from_min, change_from_max)
+            
+            # Calculate percentage change
+            change_percentage = (price_change / current_price) * 100 if current_price > 0 else 0
+            
+            # Update or create market change record
+            existing_change = db.query(MarketChange).filter(
+                MarketChange.market_id == market.id,
+                MarketChange.change_window_days == window_days
+            ).first()
+            
+            if existing_change:
+                existing_change.price_change = price_change
+                existing_change.min_price = min_price
+                existing_change.max_price = max_price
+                existing_change.change_percentage = change_percentage
+                existing_change.calculated_at = datetime.utcnow()
+            else:
+                new_change = MarketChange(
+                    market_id=market.id,
+                    change_window_days=window_days,
+                    price_change=price_change,
+                    min_price=min_price,
+                    max_price=max_price,
+                    change_percentage=change_percentage
+                )
+                db.add(new_change)
         
-        # Update or create market change record
-        existing_change = db.query(MarketChange).filter(
-            MarketChange.market_id == market.id,
-            MarketChange.change_window_days == window_days
-        ).first()
+        db.commit()
+        logger.info(f"Computed price changes for {market.ticker}")
         
-        if existing_change:
-            existing_change.price_change = price_change
-            existing_change.min_price = min_price
-            existing_change.max_price = max_price
-            existing_change.change_percentage = change_percentage
-            existing_change.calculated_at = datetime.utcnow()
-        else:
-            new_change = MarketChange(
-                market_id=market.id,
-                change_window_days=window_days,
-                price_change=price_change,
-                min_price=min_price,
-                max_price=max_price,
-                change_percentage=change_percentage
-            )
-            db.add(new_change)
+    except Exception as e:
+        logger.warning(f"Failed to compute price changes for {market.ticker}: {str(e)}")
 
 def main():
     """Main job function"""
@@ -136,54 +229,10 @@ def main():
         
         logger.info("Kalshi API connection successful")
         
-        # Get markets from Kalshi API
-        logger.info("Fetching markets from Kalshi API...")
-        kalshi_response = kalshi_service.get_markets(limit=1000, status="open")
-        markets_data = kalshi_response.get("markets", [])
+        # Process markets (create new, update existing)
+        processed_count = process_markets(db, kalshi_service)
         
-        logger.info(f"Found {len(markets_data)} markets to process")
-        
-        for i, market_data in enumerate(markets_data, 1):
-            try:
-                # Transform Kalshi data to our format
-                transformed_data = {
-                    "ticker": market_data["ticker"],
-                    "title": market_data["title"],
-                    "subtitle": market_data.get("subtitle"),
-                    "category": market_data.get("category", "Other"),
-                    "status": market_data.get("status", "open"),
-                    "current_price": market_data.get("last_price", 0) / 100,  # Convert cents to probability
-                    "volume_24h": market_data.get("volume_24h", 0),
-                    "liquidity": market_data.get("liquidity", 0),
-                    "open_time": datetime.fromisoformat(market_data["open_time"].rstrip("Z")) if market_data.get("open_time") else None,
-                    "close_time": datetime.fromisoformat(market_data["close_time"].rstrip("Z")) if market_data.get("close_time") else None,
-                    "expiration_time": datetime.fromisoformat(market_data["expiration_time"].rstrip("Z")) if market_data.get("expiration_time") else None,
-                    "resolution_rules": market_data.get("resolution_rules"),
-                    "tags": json.dumps(market_data.get("tags", []))
-                }
-                
-                # Update market data
-                market = update_market_data(db, transformed_data)
-                
-                # Get and update price history
-                try:
-                    history_data = kalshi_service.get_market_history(market.ticker)
-                    update_price_history(db, market, history_data)
-                    
-                    # Calculate percentage changes
-                    calculate_market_changes(db, market)
-                    
-                    logger.info(f"Processed market {i}/{len(markets_data)}: {market.ticker}")
-                except Exception as e:
-                    logger.warning(f"Failed to update history for {market.ticker}: {str(e)}")
-                    continue
-                    
-            except Exception as e:
-                logger.error(f"Failed to process market {market_data.get('ticker', 'unknown')}: {str(e)}")
-                continue
-        
-        db.commit()
-        logger.info(f"Successfully processed {len(markets_data)} markets")
+        logger.info(f"Successfully processed {processed_count} markets")
         return 0
         
     except Exception as e:

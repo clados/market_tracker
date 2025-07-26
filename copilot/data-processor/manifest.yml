@@ -1,0 +1,42 @@
+name: data-processor
+type: Scheduled Job
+
+# Job configuration
+image:
+  build: 
+    dockerfile: ./jobs/data-processor/Dockerfile
+    context: ./jobs/data-processor
+  port: 8080
+
+# Schedule configuration (runs every 6 hours)
+on:
+  schedule: "0 */6 * * *"
+
+# Environment variables
+variables:
+  ENVIRONMENT: ${COPILOT_ENVIRONMENT_NAME}
+  KALSHI_API_BASE_URL: https://api.elections.kalshi.com/trade-api/v2
+  JOB_INTERVAL_HOURS: 6
+  DB_HOST:
+    from_cfn: ${COPILOT_APPLICATION_NAME}-${COPILOT_ENVIRONMENT_NAME}-marketdbEndpoint
+  DB_PORT: 5432
+  DB_NAME: marketdb
+
+# Resource configuration
+cpu: 512
+memory: 1024
+timeout: 30m
+
+# Network configuration
+network:
+  vpc:
+    security_groups:
+      - from_cfn: ${COPILOT_APPLICATION_NAME}-${COPILOT_ENVIRONMENT_NAME}-marketdbSecurityGroup
+# Secrets
+secrets:
+  KALSHI_KEY_ID: 
+    secretsmanager: /kalshi-market-tracker/kalshi-key-id
+  KALSHI_PRIVATE_KEY: 
+    secretsmanager: /kalshi-market-tracker/kalshi-private-key
+  DB_SECRET:
+    from_cfn: ${COPILOT_APPLICATION_NAME}-${COPILOT_ENVIRONMENT_NAME}-marketdbSecret 

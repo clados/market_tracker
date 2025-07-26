@@ -1,6 +1,6 @@
 import { Market, PriceHistory } from '../types/market';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-import { X, TrendingUp, TrendingDown, Volume2, Calendar, Tag, Loader2 } from 'lucide-react';
+import { X, TrendingUp, TrendingDown, BarChart3, Calendar, Tag, Loader2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { useState, useEffect } from 'react';
 import { backendApi } from '../services/backendApi';
@@ -129,9 +129,9 @@ export const MarketDetail: React.FC<MarketDetailProps> = ({
               </div>
             </div>
             <div className="bg-gray-700 rounded-lg p-4">
-              <div className="text-gray-400 text-sm mb-1">Volume</div>
+              <div className="text-gray-400 text-sm mb-1">Volume last 24h</div>
               <div className="text-white text-2xl font-bold flex items-center">
-                <Volume2 className="w-5 h-5 mr-1" />
+                <BarChart3 className="w-5 h-5 mr-1" />
                 {formatVolume(market.volume24h)}
               </div>
             </div>

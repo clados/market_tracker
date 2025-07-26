@@ -73,6 +73,7 @@ class BackendApiService {
     return {
       id: backendMarket.id,
       ticker: backendMarket.ticker,
+      seriesTicker: backendMarket.series_ticker,
       title: backendMarket.title,
       subtitle: backendMarket.subtitle || '',
       category: backendMarket.category,

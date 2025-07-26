@@ -1,6 +1,6 @@
 import { Market, PriceHistory } from '../types/market';
 import { Sparkline } from './Sparkline';
-import { TrendingUp, TrendingDown, Volume2 } from 'lucide-react';
+import { TrendingUp, TrendingDown, BarChart3, ExternalLink } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { backendApi } from '../services/backendApi';
 
@@ -41,8 +41,11 @@ export const MarketCard: React.FC<MarketCardProps> = ({ market, onSelect }) => {
             const changeFromMax = Math.abs(currentPrice - maxPrice);
             
             // Use the larger change (more dramatic)
-            const newPriceChange = Math.max(changeFromMin, changeFromMax);
-            setCalculatedPriceChange(newPriceChange);
+            const absoluteChange = Math.max(changeFromMin, changeFromMax);
+            
+            // Calculate percentage change relative to current price
+            const percentageChange = currentPrice > 0 ? (absoluteChange / currentPrice) : 0;
+            setCalculatedPriceChange(percentageChange);
           }
         }
       } catch (error) {
@@ -63,6 +66,27 @@ export const MarketCard: React.FC<MarketCardProps> = ({ market, onSelect }) => {
     return `${(value * 100).toFixed(1)}%`;
   };
 
+  // Function to construct Kalshi URL using actual data
+  const getKalshiUrl = () => {
+    if (market.seriesTicker) {
+      // Extract base series name from series_ticker (remove date and market suffix)
+      // Example: "KXATPMATCH-25JUL26DAVSHE" -> "kxatpmatch"
+      const baseSeriesName = market.seriesTicker
+        .split('-')[0]  // Take the part before the first dash
+        .toLowerCase();  // Convert to lowercase
+      
+      // Create a slug from the title
+      const marketSlug = market.title.toLowerCase()
+        .replace(/[^a-z0-9]/g, '-')
+        .replace(/-+/g, '-')
+        .replace(/^-|-$/g, '');
+      
+      return `https://kalshi.com/markets/${baseSeriesName}/${marketSlug}`;
+    }
+    // Fallback to simple ticker-based URL if no series_ticker
+    return `https://kalshi.com/markets/${market.ticker}`;
+  };
+
   const isPositiveChange = calculatedPriceChange > 0;
   const sparklineColor = isPositiveChange ? '#10b981' : '#ef4444';
 
@@ -73,8 +97,18 @@ export const MarketCard: React.FC<MarketCardProps> = ({ market, onSelect }) => {
     >
       <div className="flex justify-between items-start mb-3">
         <div className="flex-1">
-          <h3 className="text-white font-semibold text-sm mb-1 line-clamp-2">
+          <h3 className="text-white font-semibold text-sm mb-1 line-clamp-2 flex items-center">
             {market.title}
+            <a
+              href={getKalshiUrl()}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="ml-2 text-blue-400 hover:text-blue-300 flex items-center"
+              title="View on Kalshi"
+              onClick={e => e.stopPropagation()}
+            >
+              <ExternalLink className="w-4 h-4" />
+            </a>
           </h3>
           <p className="text-gray-400 text-xs font-mono">
             {market.ticker}
@@ -116,9 +150,9 @@ export const MarketCard: React.FC<MarketCardProps> = ({ market, onSelect }) => {
 
       <div className="flex justify-between items-center">
         <div className="flex items-center space-x-1">
-          <Volume2 className="w-3 h-3 text-gray-400" />
+          <BarChart3 className="w-3 h-3 text-gray-400" />
           <span className="text-gray-400 text-xs">
-            {formatVolume(market.volume24h)}
+            Volume last 24h: {formatVolume(market.volume24h)}
           </span>
         </div>
         <div className="flex items-center space-x-2">

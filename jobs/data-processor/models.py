@@ -9,6 +9,7 @@ class Market(Base):
     
     id = Column(Integer, primary_key=True, index=True)
     ticker = Column(String(50), unique=True, index=True, nullable=False)
+    series_ticker = Column(String(50), index=True)
     title = Column(String(500), nullable=False)
     subtitle = Column(Text)
     category = Column(String(100), index=True)

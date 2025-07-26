@@ -1,0 +1,33 @@
+name: jupyter
+type: Load Balanced Web Service
+
+image:
+  build: ./jupyter/Dockerfile
+  port: 8888
+
+http:
+  path: /jupyter/*
+  healthcheck:
+    path: /jupyter/
+    success_codes: "200-399"
+    grace_period: 60s
+    healthy_threshold: 2
+    unhealthy_threshold: 2
+    interval: 15s
+    timeout: 10s
+
+cpu: 2048
+memory: 4096
+count: 1
+
+variables:
+  ENVIRONMENT: ${COPILOT_ENVIRONMENT_NAME}
+  DB_HOST:
+    from_cfn: ${COPILOT_APPLICATION_NAME}-${COPILOT_ENVIRONMENT_NAME}-marketdbEndpoint
+  DB_PORT: 5432
+  DB_NAME: marketdb
+  JUPYTER_PASSWORD: jupyter123
+
+secrets:
+  DB_SECRET:
+    from_cfn: ${COPILOT_APPLICATION_NAME}-${COPILOT_ENVIRONMENT_NAME}-marketdbSecret
