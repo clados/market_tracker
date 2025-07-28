@@ -87,7 +87,7 @@ async def get_markets(
         if min_change is not None and market_ids:
             markets_with_change = db.query(MarketChange.market_id).filter(
                 MarketChange.market_id.in_(market_ids),
-                MarketChange.price_change >= min_change
+                func.abs(MarketChange.price_change) >= min_change
             ).distinct().all()
             filtered_market_ids = [m[0] for m in markets_with_change]
         else:
@@ -134,15 +134,15 @@ async def get_market_stats(
         # 3. Big Movers - count of markets with price change >= min_change filter
         big_movers_count = 0
         if min_change and min_change > 0:
-            # Count markets that meet the min_change criteria
+            # Count markets that meet the min_change criteria (absolute value)
             markets_with_change = db.query(MarketChange.market_id).filter(
-                MarketChange.price_change >= min_change
+                func.abs(MarketChange.price_change) >= min_change
             ).distinct().all()
             big_movers_count = len(markets_with_change)
         else:
-            # If no min_change filter, show markets with >= 10% change
+            # If no min_change filter, show markets with >= 10% change (absolute value)
             markets_with_change = db.query(MarketChange.market_id).filter(
-                MarketChange.price_change >= 0.1  # 10% change
+                func.abs(MarketChange.price_change) >= 0.1  # 10% change
             ).distinct().all()
             big_movers_count = len(markets_with_change)
         
