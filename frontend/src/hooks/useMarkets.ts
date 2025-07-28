@@ -121,7 +121,13 @@ export const useMarkets = () => {
   const getRelatedMarkets = (marketId: string): Market[] => {
     const market = markets.find(m => m.ticker === marketId);
     if (!market) return [];
-    return markets.filter(m => market.related.includes(m.ticker));
+    
+    // For now, return markets in the same category as a simple related markets implementation
+    // This can be enhanced later with more sophisticated related market logic
+    return markets.filter(m => 
+      m.ticker !== marketId && 
+      m.category === market.category
+    ).slice(0, 3); // Limit to 3 related markets
   };
 
   const refreshMarkets = () => {

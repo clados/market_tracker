@@ -8,6 +8,9 @@ image:
     context: .
   port: 8000
 
+# Enable exec for debugging
+exec: true
+
 # Health check
 http:
   path: '/api'

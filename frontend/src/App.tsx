@@ -156,6 +156,7 @@ function App() {
               <MarketCard
                 key={market.id}
                 market={market}
+                filters={filters}
                 onSelect={handleSelectMarket}
               />
             ))}
@@ -175,6 +176,7 @@ function App() {
         {selectedMarket && (
           <MarketDetail
             market={selectedMarket}
+            filters={filters}
             relatedMarkets={relatedMarkets}
             onClose={handleCloseDetail}
             onSelectMarket={handleSelectMarket}

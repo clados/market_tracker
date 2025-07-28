@@ -8,9 +8,9 @@ image:
     context: ./jobs/data-processor
   port: 8080
 
-# Schedule configuration (runs every 6 hours)
+# Schedule configuration (runs daily)
 on:
-  schedule: "0 */6 * * *"
+  schedule: "0 0 * * *"
 
 # Environment variables
 variables:
@@ -39,4 +39,4 @@ secrets:
   KALSHI_PRIVATE_KEY: 
     secretsmanager: /kalshi-market-tracker/kalshi-private-key
   DB_SECRET:
-    from_cfn: ${COPILOT_APPLICATION_NAME}-${COPILOT_ENVIRONMENT_NAME}-marketdbSecret 
+    secretsmanager: DBSecret-TATa1hxGo91h 

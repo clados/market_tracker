@@ -1,4 +1,4 @@
-import { Market, PriceHistory } from '../types/market';
+import { Market, PriceHistory, FilterState } from '../types/market';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { X, TrendingUp, TrendingDown, BarChart3, Calendar, Tag, Loader2 } from 'lucide-react';
 import { format } from 'date-fns';
@@ -7,6 +7,7 @@ import { backendApi } from '../services/backendApi';
 
 interface MarketDetailProps {
   market: Market;
+  filters: FilterState;
   relatedMarkets: Market[];
   onClose: () => void;
   onSelectMarket: (market: Market) => void;
@@ -14,6 +15,7 @@ interface MarketDetailProps {
 
 export const MarketDetail: React.FC<MarketDetailProps> = ({ 
   market, 
+  filters,
   relatedMarkets, 
   onClose,
   onSelectMarket 
@@ -34,31 +36,30 @@ export const MarketDetail: React.FC<MarketDetailProps> = ({
           console.log(`MarketDetail: Loaded ${history.length} history points for ${market.ticker}`);
           
           // Recalculate price change based on loaded history
-          if (history.length > 0) {
+          if (history.length >= 2) {
             const currentPrice = market.currentProbability;
             const now = new Date();
-            const windowStart = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000); // 30 days ago
+            const windowStart = new Date(now.getTime() - filters.changeWindow * 24 * 60 * 60 * 1000);
             
-            // Filter history to the last 30 days
+            // Filter history to the change window period
             const windowHistory = history.filter(point => 
               point.timestamp >= windowStart
             );
             
-            if (windowHistory.length > 0) {
-              const prices = windowHistory.map(point => point.price);
-              const minPrice = Math.min(...prices);
-              const maxPrice = Math.max(...prices);
-              
-              // Calculate absolute change from current price to the most extreme point
-              const changeFromMin = Math.abs(currentPrice - minPrice);
-              const changeFromMax = Math.abs(currentPrice - maxPrice);
-              
-              // Use the larger change (more dramatic)
-              const newPriceChange = Math.max(changeFromMin, changeFromMax);
-              setCalculatedPriceChange(newPriceChange);
-              
-              console.log(`MarketDetail: Recalculated price change for ${market.ticker}: current=${currentPrice}, min=${minPrice}, max=${maxPrice}, change=${newPriceChange}`);
+            if (windowHistory.length >= 2) {
+              // Calculate change from the start of the window to current price
+              // Sort by timestamp to ensure we get the actual start price
+              const sortedHistory = windowHistory.sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime());
+              const startPrice = sortedHistory[0].price;
+              const priceChange = currentPrice - startPrice;
+              setCalculatedPriceChange(priceChange);
+            } else {
+              // Not enough data points in the window
+              setCalculatedPriceChange(0);
             }
+          } else {
+            // Not enough history data at all
+            setCalculatedPriceChange(0);
           }
         } catch (error) {
           console.error(`MarketDetail: Failed to load history for ${market.ticker}:`, error);
@@ -69,7 +70,7 @@ export const MarketDetail: React.FC<MarketDetailProps> = ({
     };
 
     loadHistory();
-  }, [market.ticker, priceHistory.length, market.currentProbability]);
+  }, [market.ticker, priceHistory.length, market.currentProbability, filters.changeWindow]);
 
   const formatVolume = (volume: number) => {
     if (volume >= 1000000) return `$${(volume / 1000000).toFixed(1)}M`;
@@ -84,11 +85,11 @@ export const MarketDetail: React.FC<MarketDetailProps> = ({
   const chartData = priceHistory.map(point => ({
     timestamp: point.timestamp.getTime(),
     price: point.price * 100,
-    volume: point.volume,
-    date: format(point.timestamp, 'MMM dd')
+    volume: point.volume
   }));
 
   const isPositiveChange = calculatedPriceChange > 0;
+  const hasPriceChange = calculatedPriceChange !== 0;
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
@@ -125,7 +126,11 @@ export const MarketDetail: React.FC<MarketDetailProps> = ({
                 ) : (
                   <TrendingDown className="w-5 h-5 mr-1" />
                 )}
-                {isPositiveChange ? '+' : ''}{formatPercentage(calculatedPriceChange)}
+                {hasPriceChange ? (
+                  `${calculatedPriceChange > 0 ? '+' : ''}${formatPercentage(Math.abs(calculatedPriceChange))}`
+                ) : (
+                  'No data'
+                )}
               </div>
             </div>
             <div className="bg-gray-700 rounded-lg p-4">
@@ -160,7 +165,7 @@ export const MarketDetail: React.FC<MarketDetailProps> = ({
                   <LineChart data={chartData}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
                     <XAxis 
-                      dataKey="date" 
+                      dataKey="timestamp" 
                       stroke="#9CA3AF"
                       fontSize={12}
                     />

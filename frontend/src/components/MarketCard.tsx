@@ -1,4 +1,4 @@
-import { Market, PriceHistory } from '../types/market';
+import { Market, PriceHistory, FilterState } from '../types/market';
 import { Sparkline } from './Sparkline';
 import { TrendingUp, TrendingDown, BarChart3, ExternalLink } from 'lucide-react';
 import { useState, useEffect } from 'react';
@@ -6,10 +6,11 @@ import { backendApi } from '../services/backendApi';
 
 interface MarketCardProps {
   market: Market;
+  filters: FilterState;
   onSelect: (market: Market) => void;
 }
 
-export const MarketCard: React.FC<MarketCardProps> = ({ market, onSelect }) => {
+export const MarketCard: React.FC<MarketCardProps> = ({ market, filters, onSelect }) => {
   const [priceHistory, setPriceHistory] = useState<PriceHistory[]>(market.priceHistory);
   const [calculatedPriceChange, setCalculatedPriceChange] = useState(0);
 
@@ -20,33 +21,31 @@ export const MarketCard: React.FC<MarketCardProps> = ({ market, onSelect }) => {
         const history = await backendApi.getMarketHistory(market.ticker);
         setPriceHistory(history);
         
-        // Calculate price change using 30-day window (same as MarketDetail)
-        if (history.length > 0) {
+        // Calculate price change using the filter's change window
+        if (history.length >= 2) {
           const currentPrice = market.currentProbability;
           const now = new Date();
-          const windowStart = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000); // 30 days ago
+          const windowStart = new Date(now.getTime() - filters.changeWindow * 24 * 60 * 60 * 1000);
           
-          // Filter history to the last 30 days
+          // Filter history to the change window period
           const windowHistory = history.filter(point => 
             point.timestamp >= windowStart
           );
           
-          if (windowHistory.length > 0) {
-            const prices = windowHistory.map(point => point.price);
-            const minPrice = Math.min(...prices);
-            const maxPrice = Math.max(...prices);
-            
-            // Calculate absolute change from current price to the most extreme point
-            const changeFromMin = Math.abs(currentPrice - minPrice);
-            const changeFromMax = Math.abs(currentPrice - maxPrice);
-            
-            // Use the larger change (more dramatic)
-            const absoluteChange = Math.max(changeFromMin, changeFromMax);
-            
-            // Calculate percentage change relative to current price
-            const percentageChange = currentPrice > 0 ? (absoluteChange / currentPrice) : 0;
-            setCalculatedPriceChange(percentageChange);
+          if (windowHistory.length >= 2) {
+            // Calculate change from the start of the window to current price
+            // Sort by timestamp to ensure we get the actual start price
+            const sortedHistory = windowHistory.sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime());
+            const startPrice = sortedHistory[0].price;
+            const priceChange = currentPrice - startPrice;
+            setCalculatedPriceChange(priceChange);
+          } else {
+            // Not enough data points in the window
+            setCalculatedPriceChange(0);
           }
+        } else {
+          // Not enough history data at all
+          setCalculatedPriceChange(0);
         }
       } catch (error) {
         console.error(`MarketCard: Failed to load history for ${market.ticker}:`, error);
@@ -54,7 +53,7 @@ export const MarketCard: React.FC<MarketCardProps> = ({ market, onSelect }) => {
     };
 
     loadHistory();
-  }, [market.ticker, market.currentProbability]);
+  }, [market.ticker, market.currentProbability, filters.changeWindow]);
 
   const formatVolume = (volume: number) => {
     if (volume >= 1000000) return `$${(volume / 1000000).toFixed(1)}M`;
@@ -88,6 +87,7 @@ export const MarketCard: React.FC<MarketCardProps> = ({ market, onSelect }) => {
   };
 
   const isPositiveChange = calculatedPriceChange > 0;
+  const hasPriceChange = calculatedPriceChange !== 0;
   const sparklineColor = isPositiveChange ? '#10b981' : '#ef4444';
 
   return (
@@ -115,16 +115,22 @@ export const MarketCard: React.FC<MarketCardProps> = ({ market, onSelect }) => {
           </p>
         </div>
         <div className="flex items-center space-x-1 ml-2">
-          {isPositiveChange ? (
-            <TrendingUp className="w-4 h-4 text-green-400" />
+          {hasPriceChange ? (
+            <>
+              {isPositiveChange ? (
+                <TrendingUp className="w-4 h-4 text-green-400" />
+              ) : (
+                <TrendingDown className="w-4 h-4 text-red-400" />
+              )}
+              <span className={`text-sm font-semibold ${
+                isPositiveChange ? 'text-green-400' : 'text-red-400'
+              }`}>
+                {calculatedPriceChange > 0 ? '+' : ''}{formatPercentage(Math.abs(calculatedPriceChange))}
+              </span>
+            </>
           ) : (
-            <TrendingDown className="w-4 h-4 text-red-400" />
+            <span className="text-gray-400 text-sm">No data</span>
           )}
-          <span className={`text-sm font-semibold ${
-            isPositiveChange ? 'text-green-400' : 'text-red-400'
-          }`}>
-            {isPositiveChange ? '+' : ''}{formatPercentage(calculatedPriceChange)}
-          </span>
         </div>
       </div>
 

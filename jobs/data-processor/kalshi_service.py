@@ -85,7 +85,7 @@ class KalshiService:
             raise Exception(f"API request failed: {str(e)}")
     
     def get_markets(self, limit: int = 100, cursor: Optional[str] = None, 
-                    status: str = "open", min_liquidity: int = 0) -> Dict[str, Any]:
+                    status: str = "open") -> Dict[str, Any]:
         """Get markets from Kalshi API"""
         params = {
             "limit": limit,
@@ -122,26 +122,48 @@ class KalshiService:
         
         end_ts = int(time.time())
         
+        print(f"Fetching history for {ticker}: open_ts={open_ts} ({datetime.fromtimestamp(open_ts)}), end_ts={end_ts} ({datetime.fromtimestamp(end_ts)})")
+        
         # Download candlesticks in chunks
         path = f"/series/{series_ticker}/markets/{ticker}/candlesticks"
-        max_span = period_minutes * 60 * 5000  # API limit per call
-        window_end = end_ts
-        all_candles = []
+        period_seconds = period_minutes * 60
+        max_periods = 5000  # API limit per call
+        max_span_seconds = period_seconds * max_periods
         
-        while window_end > open_ts:
-            window_start = max(open_ts, window_end - max_span)
+        all_candles = []
+        current_end_ts = end_ts
+        
+        while current_end_ts > open_ts:
+            current_start_ts = max(open_ts, current_end_ts - max_span_seconds)
             
             params = {
                 "period_interval": period_minutes,
-                "start_ts": window_start,
-                "end_ts": window_end
+                "start_ts": current_start_ts,
+                "end_ts": current_end_ts
             }
             
-            response = self._make_request("GET", path, params)
-            candles = response.get("candlesticks", [])
-            all_candles.extend(candles)
+            print(f"  Requesting chunk: start_ts={current_start_ts} ({datetime.fromtimestamp(current_start_ts)}), end_ts={current_end_ts} ({datetime.fromtimestamp(current_end_ts)})")
             
-            window_end = window_start - period_minutes * 60  # move backward
+            try:
+                response = self._make_request("GET", path, params)
+                candles = response.get("candlesticks", [])
+                all_candles.extend(candles)
+                
+                print(f"  Got {len(candles)} candles in this chunk")
+                
+                # If we got fewer than max_periods, we've reached the beginning
+                if len(candles) < max_periods:
+                    print(f"  Reached beginning (got {len(candles)} < {max_periods})")
+                    break
+                    
+                # Move backward for next chunk
+                current_end_ts = current_start_ts
+                
+            except Exception as e:
+                print(f"Failed to get candlesticks for {ticker}: {str(e)}")
+                break
+        
+        print(f"Total candles fetched for {ticker}: {len(all_candles)}")
         
         # Transform candlesticks to our format
         history = []
@@ -149,7 +171,7 @@ class KalshiService:
             yes_bid_close = float(candle.get("yes_bid", {}).get("close", 0))
             yes_ask_close = float(candle.get("yes_ask", {}).get("close", 0))
             mid_price = (yes_bid_close + yes_ask_close) / 2
-            probability = round(mid_price / 100, 4)
+            probability = round(mid_price / 100, 3)
             
             history.append({
                 "timestamp": datetime.fromtimestamp(candle.get("end_period_ts", 0)),

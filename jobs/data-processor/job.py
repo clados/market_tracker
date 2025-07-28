@@ -11,7 +11,7 @@ import os
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 
 from database import get_db, get_engine
-from models import Base, Market, PriceHistory, MarketChange
+from models import Market, PriceHistory, MarketChange
 from kalshi_service import KalshiService
 from datetime import datetime, timedelta
 import json
@@ -37,7 +37,7 @@ def process_markets(db, kalshi_service):
     # Filter for active markets only
     markets_data = [market for market in all_markets_data if market.get("status") == "active"]
     
-    logger.info(f"Found {len(all_markets_data)} total markets, {len(markets_data)} active markets to process")
+    logger.info(f"Found {len(all_markets_data)} total markets, {len(markets_data)} active markets")
     
     new_markets_count = 0
     updated_markets_count = 0
@@ -57,7 +57,7 @@ def process_markets(db, kalshi_service):
                 "subtitle": market_data.get("subtitle"),
                 "category": market_data.get("category", "Other"),
                 "status": market_data.get("status", "active"),
-                "current_price": market_data.get("last_price", 0) / 100,  # Convert cents to probability
+                "current_price": 0,  # Will be updated from history data
                 "volume_24h": market_data.get("volume_24h", 0),
                 "liquidity": market_data.get("liquidity", 0),
                 "open_time": datetime.fromisoformat(market_data["open_time"].rstrip("Z")) if market_data.get("open_time") else None,
@@ -135,6 +135,26 @@ def process_market_history(db, kalshi_service, market):
         
         if new_history_points > 0:
             logger.info(f"Added {new_history_points} new history points for {market.ticker}")
+            
+            # Update current price to match the latest history point for consistency
+            latest_history = db.query(PriceHistory).filter(
+                PriceHistory.market_id == market.id
+            ).order_by(PriceHistory.timestamp.desc()).first()
+            
+            if latest_history:
+                logger.info(f"Updating current price for {market.ticker} from {market.current_price} to {latest_history.price}")
+                market.current_price = latest_history.price
+                db.commit()
+        else:
+            # Even if no new history points, ensure current_price matches latest history
+            latest_history = db.query(PriceHistory).filter(
+                PriceHistory.market_id == market.id
+            ).order_by(PriceHistory.timestamp.desc()).first()
+            
+            if latest_history and latest_history.price != market.current_price:
+                logger.info(f"Syncing current price for {market.ticker} from {market.current_price} to {latest_history.price}")
+                market.current_price = latest_history.price
+                db.commit()
         
         # Compute price changes after adding new history
         compute_price_changes(db, market)
@@ -156,16 +176,25 @@ def compute_price_changes(db, market):
         
         current_price = market.current_price
         
+        # Use the latest history timestamp as the reference point
+        # This ensures we're calculating changes relative to the most recent data
+        latest_timestamp = history[0].timestamp
+        
+        logger.info(f"Computing changes for {market.ticker}: current_price={current_price}, latest_timestamp={latest_timestamp}, history_points={len(history)}")
+        
         # Calculate changes for different time windows
         change_windows = [1, 7, 30, 90]  # days
         
         for window_days in change_windows:
-            cutoff_date = datetime.utcnow() - timedelta(days=window_days)
+            cutoff_date = latest_timestamp - timedelta(days=window_days)
             
-            # Get history within the window
+            # Get history within the window (from cutoff to latest)
             window_history = [h for h in history if h.timestamp >= cutoff_date]
             
+            logger.info(f"  Window {window_days}d: cutoff={cutoff_date}, points_in_window={len(window_history)}")
+            
             if len(window_history) < 2:
+                logger.info(f"  Skipping {window_days}d window - insufficient data")
                 continue
             
             # Calculate price changes
@@ -173,13 +202,20 @@ def compute_price_changes(db, market):
             min_price = min(prices)
             max_price = max(prices)
             
-            # Calculate the most dramatic change
-            change_from_min = abs(current_price - min_price)
-            change_from_max = abs(current_price - max_price)
-            price_change = max(change_from_min, change_from_max)
+            # Calculate directional changes (positive = increase, negative = decrease)
+            change_from_min = current_price - min_price
+            change_from_max = current_price - max_price
+            
+            # Use the more dramatic change while preserving direction
+            if abs(change_from_min) > abs(change_from_max):
+                price_change = change_from_min
+            else:
+                price_change = change_from_max
             
             # Calculate percentage change
             change_percentage = (price_change / current_price) * 100 if current_price > 0 else 0
+            
+            logger.info(f"  {window_days}d change: min={min_price}, max={max_price}, change={price_change}, percentage={change_percentage}")
             
             # Update or create market change record
             existing_change = db.query(MarketChange).filter(

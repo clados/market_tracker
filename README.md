@@ -20,3 +20,8 @@ aws secretsmanager create-secret \
     --name "/kalshi-market-tracker/kalshi-key-id" \
     --description "Kalshi API key ID for data processor job" \
     --secret-string "YOUR_ACTUAL_KEY_ID_HERE"
+
+
+copilot svc exec --name backend --command "bash -c 'cd /app && python -c \"from database import get_engine; from models import Base; engine = get_engine(); Base.metadata.drop_all(engine); print(\\\"Tables dropped\\\")\"'"
+
+copilot svc exec --name backend --command "bash -c 'export ALEMBIC_DATABASE_URL=\"postgresql://postgres:\$(echo \$DB_SECRET | jq -r .password)@\$DB_HOST:\$DB_PORT/\$DB_NAME\" && cd /app/migrations && alembic current'"

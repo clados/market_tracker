@@ -97,18 +97,18 @@ class MarketService:
             ).first()
             
             if existing_change:
-                existing_change.price_change = price_change
-                existing_change.min_price = min_price
-                existing_change.max_price = max_price
+                existing_change.probability_change = price_change
+                existing_change.min_probability = min_price
+                existing_change.max_probability = max_price
                 existing_change.change_percentage = change_percentage
                 existing_change.calculated_at = datetime.utcnow()
             else:
                 new_change = MarketChange(
                     market_id=market.id,
                     change_window_days=window_days,
-                    price_change=price_change,
-                    min_price=min_price,
-                    max_price=max_price,
+                    probability_change=price_change,
+                    min_probability=min_price,
+                    max_probability=max_price,
                     change_percentage=change_percentage
                 )
                 db.add(new_change)

@@ -22,7 +22,7 @@ interface BackendMarketStatsResponse {
 
 interface BackendPriceHistoryResponse {
   timestamp: string;
-  price: number;
+  price: number; // Backend field name
   volume: number;
 }
 
@@ -75,21 +75,21 @@ class BackendApiService {
       ticker: backendMarket.ticker,
       seriesTicker: backendMarket.series_ticker,
       title: backendMarket.title,
-      subtitle: backendMarket.subtitle || '',
+      subtitle: backendMarket.subtitle,
       category: backendMarket.category,
       status: backendMarket.status,
-      currentProbability: backendMarket.current_price,
+      currentProbability: backendMarket.current_price, // Backend uses current_price, frontend displays as probability
       volume24h: backendMarket.volume_24h,
       liquidity: backendMarket.liquidity,
-      openTime: backendMarket.open_time,
-      closeTime: backendMarket.close_time,
-      expirationTime: backendMarket.expiration_time,
-      resolutionRules: backendMarket.resolution_rules || '',
-      tags: backendMarket.tags || '',
-      createdAt: backendMarket.created_at,
-      updatedAt: backendMarket.updated_at,
-      priceHistory: priceHistory,
-      related: [] // Will be populated separately if needed
+      openTime: backendMarket.open_time ? new Date(backendMarket.open_time) : undefined,
+      closeTime: backendMarket.close_time ? new Date(backendMarket.close_time) : undefined,
+      expirationTime: backendMarket.expiration_time ? new Date(backendMarket.expiration_time) : undefined,
+      resolutionRules: backendMarket.resolution_rules,
+      tags: backendMarket.tags,
+      createdAt: new Date(backendMarket.created_at),
+      updatedAt: new Date(backendMarket.updated_at),
+      priceHistory: priceHistory, // Keep backend field name
+      marketChanges: []
     };
   }
 
@@ -182,7 +182,7 @@ class BackendApiService {
       
       return data.map(item => ({
         timestamp: new Date(item.timestamp),
-        price: item.price,
+        price: item.price, // Backend field name
         volume: item.volume
       }));
     } catch (error) {
@@ -201,6 +201,19 @@ class BackendApiService {
     } catch (error) {
       console.error('BackendApiService: Failed to fetch market detail:', error);
       return null;
+    }
+  }
+
+  async getMarketChanges(ticker: string, signal?: AbortSignal): Promise<any> {
+    try {
+      const url = getBackendUrl(`/api/markets/${ticker}/changes`);
+      const response = await this.fetchWithRetry(url, { signal });
+      const data = await response.json();
+      
+      return data.changes;
+    } catch (error) {
+      console.error('BackendApiService: Failed to fetch market changes:', error);
+      return [];
     }
   }
 }
