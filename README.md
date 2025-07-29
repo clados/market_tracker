@@ -10,6 +10,8 @@
 docker exec -it market-tracker-postgres psql -U dbadmin -d marketdb
 docker exec -it market-tracker-postgres psql -U dbadmin -d marketdb -c "SELECT COUNT(*) as total_history FROM price_history;"
 
+docker exec -it market-tracker-postgres psql -U dbadmin -d marketdb -c "TRUNCATE TABLE price_history, market_changes, markets CASCADE;"
+
 aws secretsmanager create-secret \
     --name "/kalshi-market-tracker/kalshi-private-key" \
     --description "Kalshi private key for data processor job" \
