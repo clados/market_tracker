@@ -1,5 +1,4 @@
 import { Market, PriceHistory, FilterState } from '../types/market';
-import { Sparkline } from './Sparkline';
 import { TrendingUp, TrendingDown, BarChart3, ExternalLink } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { backendApi } from '../services/backendApi';
@@ -88,7 +87,6 @@ export const MarketCard: React.FC<MarketCardProps> = ({ market, filters, onSelec
 
   const isPositiveChange = calculatedPriceChange > 0;
   const hasPriceChange = calculatedPriceChange !== 0;
-  const sparklineColor = isPositiveChange ? '#10b981' : '#ef4444';
 
   return (
     <div 
@@ -140,17 +138,6 @@ export const MarketCard: React.FC<MarketCardProps> = ({ market, filters, onSelec
           <span className="text-white text-lg font-bold">
             {formatPercentage(market.currentProbability)}
           </span>
-        </div>
-        <div className="h-10 mb-2">
-          <Sparkline 
-            data={priceHistory.map(point => ({
-              timestamp: point.timestamp.toISOString(),
-              price: point.price,
-              volume: point.volume
-            }))} 
-            color={sparklineColor}
-            height={40}
-          />
         </div>
       </div>
 
