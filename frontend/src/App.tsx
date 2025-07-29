@@ -1,12 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useMarkets } from './hooks/useMarkets';
 import { MarketCard } from './components/MarketCard';
 import { FilterBar } from './components/FilterBar';
-import { Pagination } from './components/Pagination';
 import { MarketDetail } from './components/MarketDetail';
 
 import { Market } from './types/market';
-import { BarChart3, TrendingUp, Eye, AlertCircle } from 'lucide-react';
+import { BarChart3, TrendingUp, Eye, AlertCircle, Loader2 } from 'lucide-react';
 
 function formatVolume(volume: number) {
   if (volume >= 1000) {
@@ -20,28 +19,23 @@ function App() {
     markets, 
     filters, 
     setFilters, 
-    pagination, 
-    setPagination, 
     getRelatedMarkets, 
     totalMarkets,
     totalActiveMarkets,
     highVolumeMarkets,
     bigMovers,
     loading,
+    loadingMore,
+    hasMore,
     error,
-    refreshMarkets
+    refreshMarkets,
+    loadMore
   } = useMarkets();
   
 
   const [selectedMarket, setSelectedMarket] = useState<Market | null>(null);
-
-  const handlePageChange = (page: number) => {
-    setPagination(prev => ({ ...prev, currentPage: page }));
-  };
-
-  const handlePageSizeChange = (size: number) => {
-    setPagination(prev => ({ ...prev, pageSize: size, currentPage: 1 }));
-  };
+  const observerRef = useRef<IntersectionObserver | null>(null);
+  const loadingRef = useRef<HTMLDivElement>(null);
 
   const handleSelectMarket = (market: Market) => {
     setSelectedMarket(market);
@@ -52,6 +46,25 @@ function App() {
   };
 
   const relatedMarkets = selectedMarket ? getRelatedMarkets(selectedMarket.ticker) : [];
+
+  // Intersection Observer for infinite scrolling
+  const lastElementRef = useCallback((node: HTMLDivElement | null) => {
+    if (loading) return;
+    
+    if (observerRef.current) {
+      observerRef.current.disconnect();
+    }
+    
+    observerRef.current = new IntersectionObserver(entries => {
+      if (entries[0].isIntersecting && hasMore && !loadingMore) {
+        loadMore();
+      }
+    });
+    
+    if (node) {
+      observerRef.current.observe(node);
+    }
+  }, [loading, hasMore, loadingMore, loadMore]);
 
   return (
     <div className="min-h-screen bg-gray-900">
@@ -152,24 +165,35 @@ function App() {
           </div>
         ) : (
           <div className="grid grid-cols-1 gap-6 mb-6">
-            {markets.map((market) => (
-              <MarketCard
-                key={market.id}
-                market={market}
-                filters={filters}
-                onSelect={handleSelectMarket}
-              />
+            {markets.map((market, index) => (
+              <div key={market.id} ref={index === markets.length - 1 ? lastElementRef : null}>
+                <MarketCard
+                  market={market}
+                  filters={filters}
+                  onSelect={handleSelectMarket}
+                />
+              </div>
             ))}
+            
+            {/* Loading more indicator */}
+            {loadingMore && (
+              <div className="flex justify-center items-center py-8">
+                <div className="flex items-center space-x-2 text-gray-400">
+                  <Loader2 className="w-5 h-5 animate-spin" />
+                  <span>Loading more markets...</span>
+                </div>
+              </div>
+            )}
+            
+            {/* End of results indicator */}
+            {!hasMore && markets.length > 0 && (
+              <div className="flex justify-center items-center py-8">
+                <div className="text-gray-400 text-sm">
+                  No more markets to load
+                </div>
+              </div>
+            )}
           </div>
-        )}
-
-        {/* Pagination */}
-        {!loading && (
-          <Pagination
-            pagination={pagination}
-            onPageChange={handlePageChange}
-            onPageSizeChange={handlePageSizeChange}
-          />
         )}
 
         {/* Market Detail Modal */}

@@ -1,5 +1,5 @@
-import { useState, useEffect, useRef } from 'react';
-import { Market, FilterState, PaginationState } from '../types/market';
+import { useState, useEffect, useRef, useCallback } from 'react';
+import { Market, FilterState } from '../types/market';
 import { backendApi } from '../services/backendApi';
 
 export const useMarkets = () => {
@@ -8,7 +8,9 @@ export const useMarkets = () => {
   const [highVolumeMarkets, setHighVolumeMarkets] = useState<number>(0);
   const [bigMovers, setBigMovers] = useState<number>(0);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [hasMore, setHasMore] = useState(true);
   
   const [filters, setFilters] = useState<FilterState>({
     minVolume: 0,
@@ -17,19 +19,23 @@ export const useMarkets = () => {
     search: ''
   });
 
-  const [pagination, setPagination] = useState<PaginationState>({
-    currentPage: 1,
-    pageSize: 6,
-    totalPages: 0,
-    totalItems: 0
-  });
+  const [pageSize] = useState(12); // Fixed page size for infinite scrolling
+  const [currentOffset, setCurrentOffset] = useState(0);
 
   const abortControllerRef = useRef<AbortController | null>(null);
 
-  // Simple load function
-  const loadMarkets = async () => {
+  // Load initial markets
+  const loadMarkets = async (reset: boolean = false) => {
     try {
-      setLoading(true);
+      if (reset) {
+        setLoading(true);
+        setCurrentOffset(0);
+        setMarkets([]);
+        setHasMore(true);
+      } else {
+        setLoadingMore(true);
+      }
+      
       setError(null);
 
       // Cancel previous request
@@ -43,10 +49,10 @@ export const useMarkets = () => {
       console.log('Loading markets...');
       console.log('Filter values:', { minVolume: filters.minVolume, minPriceChange: filters.minPriceChange });
       
-      const offset = (pagination.currentPage - 1) * pagination.pageSize;
+      const offset = reset ? 0 : currentOffset;
       
       const { markets: fetchedMarkets, total } = await backendApi.getMarkets(
-        pagination.pageSize,
+        pageSize,
         offset.toString(),
         'active',
         filters.minVolume > 0 ? filters.minVolume : undefined,
@@ -60,27 +66,32 @@ export const useMarkets = () => {
 
       console.log('Markets loaded:', fetchedMarkets.length);
       console.log('Total markets from API:', total);
-      setMarkets(fetchedMarkets);
       
-      const totalPages = Math.ceil(total / pagination.pageSize);
-      setPagination(prev => ({
-        ...prev,
-        totalItems: total,
-        totalPages: totalPages
-      }));
+      if (reset) {
+        setMarkets(fetchedMarkets);
+      } else {
+        setMarkets(prev => [...prev, ...fetchedMarkets]);
+      }
+      
+      // Check if there are more markets to load
+      const newOffset = offset + fetchedMarkets.length;
+      setHasMore(newOffset < total);
+      setCurrentOffset(newOffset);
 
-      // Load stats with current filter values
-      const stats = await backendApi.getMarketStats({
-        status: 'active',
-        min_liquidity: filters.minVolume > 0 ? filters.minVolume : undefined,
-        min_change: filters.minPriceChange > 0 ? filters.minPriceChange : undefined
-      }, controller.signal);
+      // Load stats only on initial load or filter change
+      if (reset) {
+        const stats = await backendApi.getMarketStats({
+          status: 'active',
+          min_liquidity: filters.minVolume > 0 ? filters.minVolume : undefined,
+          min_change: filters.minPriceChange > 0 ? filters.minPriceChange : undefined
+        }, controller.signal);
 
-      if (controller.signal.aborted) return;
+        if (controller.signal.aborted) return;
 
-      setTotalActiveMarkets(stats.total_active);
-      setHighVolumeMarkets(stats.high_volume);
-      setBigMovers(stats.big_movers);
+        setTotalActiveMarkets(stats.total_active);
+        setHighVolumeMarkets(stats.high_volume);
+        setBigMovers(stats.big_movers);
+      }
 
     } catch (err) {
       if (err instanceof Error && err.name !== 'AbortError') {
@@ -89,25 +100,27 @@ export const useMarkets = () => {
       }
     } finally {
       setLoading(false);
+      setLoadingMore(false);
       abortControllerRef.current = null;
     }
   };
 
+  // Load more markets for infinite scrolling
+  const loadMore = useCallback(async () => {
+    if (!loadingMore && hasMore && !loading) {
+      await loadMarkets(false);
+    }
+  }, [loadingMore, hasMore, loading, currentOffset, filters, pageSize]);
+
   // Load on mount
   useEffect(() => {
-    loadMarkets();
+    loadMarkets(true);
   }, []);
 
-  // Load when pagination changes
-  useEffect(() => {
-    loadMarkets();
-  }, [pagination.currentPage, pagination.pageSize]);
-
-  // Load when filters change (with debounce for sliders)
+  // Load when filters change (reset and reload)
   useEffect(() => {
     const timeoutId = setTimeout(() => {
-      setPagination(prev => ({ ...prev, currentPage: 1 }));
-      loadMarkets();
+      loadMarkets(true);
     }, 300);
 
     return () => clearTimeout(timeoutId);
@@ -131,22 +144,23 @@ export const useMarkets = () => {
   };
 
   const refreshMarkets = () => {
-    loadMarkets();
+    loadMarkets(true);
   };
 
   return {
     markets: filteredMarkets,
     filters,
     setFilters,
-    pagination,
-    setPagination,
     getRelatedMarkets,
-    totalMarkets: pagination.totalItems,
+    totalMarkets: markets.length,
     totalActiveMarkets,
     highVolumeMarkets,
     bigMovers,
     loading,
+    loadingMore,
+    hasMore,
     error,
-    refreshMarkets
+    refreshMarkets,
+    loadMore
   };
 };
