@@ -83,7 +83,7 @@ export const MarketDetail: React.FC<MarketDetailProps> = ({
   };
 
   const chartData = priceHistory.map(point => ({
-    timestamp: point.timestamp.getTime(),
+    timestamp: point.timestamp,
     price: point.price * 100,
     volume: point.volume
   }));
@@ -168,6 +168,15 @@ export const MarketDetail: React.FC<MarketDetailProps> = ({
                       dataKey="timestamp" 
                       stroke="#9CA3AF"
                       fontSize={12}
+                      tickFormatter={(value) => {
+                        const date = new Date(value);
+                        return date.toLocaleDateString('en-US', { 
+                          month: 'short', 
+                          day: 'numeric',
+                          hour: '2-digit',
+                          minute: '2-digit'
+                        });
+                      }}
                     />
                     <YAxis 
                       stroke="#9CA3AF"

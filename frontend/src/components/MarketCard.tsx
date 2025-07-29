@@ -1,5 +1,5 @@
 import { Market, PriceHistory, FilterState } from '../types/market';
-import { TrendingUp, TrendingDown, BarChart3, ExternalLink } from 'lucide-react';
+import { TrendingUp, TrendingDown, Star, ExternalLink } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { backendApi } from '../services/backendApi';
 
@@ -54,14 +54,8 @@ export const MarketCard: React.FC<MarketCardProps> = ({ market, filters, onSelec
     loadHistory();
   }, [market.ticker, market.currentProbability, filters.changeWindow]);
 
-  const formatVolume = (volume: number) => {
-    if (volume >= 1000000) return `$${(volume / 1000000).toFixed(1)}M`;
-    if (volume >= 1000) return `$${(volume / 1000).toFixed(0)}K`;
-    return `$${volume}`;
-  };
-
   const formatPercentage = (value: number) => {
-    return `${(value * 100).toFixed(1)}%`;
+    return `${(value * 100).toFixed(0)}%`;
   };
 
   // Function to construct Kalshi URL using actual data
@@ -87,74 +81,93 @@ export const MarketCard: React.FC<MarketCardProps> = ({ market, filters, onSelec
 
   const isPositiveChange = calculatedPriceChange > 0;
   const hasPriceChange = calculatedPriceChange !== 0;
+  const changePercentage = Math.abs(calculatedPriceChange * 100);
+  
+  // Determine card color based on category or other criteria
+  const getCardColor = () => {
+    if (market.category.toLowerCase().includes('politics') || market.category.toLowerCase().includes('election')) {
+      return 'bg-purple-800 border-purple-700 hover:bg-purple-750';
+    }
+    return 'bg-green-800 border-green-700 hover:bg-green-750';
+  };
+
+  // Generate contextual information based on market data
+  const getContextualInfo = () => {
+    if (market.volume24h > 10000) {
+      return "High trading volume indicates strong market interest and liquidity.";
+    }
+    if (Math.abs(calculatedPriceChange) > 0.1) {
+      return "Significant price movement detected in recent trading activity.";
+    }
+    if (market.status === 'active' && market.currentProbability > 0.8) {
+      return "Market showing strong consensus toward this outcome.";
+    }
+    return null;
+  };
+
+  const contextualInfo = getContextualInfo();
 
   return (
     <div 
-      className="bg-gray-800 rounded-lg p-6 hover:bg-gray-750 transition-colors cursor-pointer border border-gray-700 hover:border-gray-600"
+      className={`${getCardColor()} rounded-lg p-4 hover:border-gray-600 transition-colors cursor-pointer border`}
       onClick={() => onSelect(market)}
     >
-      <div className="flex justify-between items-start mb-3">
-        <div className="flex-1">
-          <h3 className="text-white font-semibold text-sm mb-1 line-clamp-2 flex items-center">
+      <div className="flex justify-between items-start">
+        {/* Main Question */}
+        <div className="flex-1 pr-4">
+          <h3 className="text-white font-medium text-sm leading-relaxed">
             {market.title}
-            <a
-              href={getKalshiUrl()}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="ml-2 text-blue-400 hover:text-blue-300 flex items-center"
-              title="View on Kalshi"
-              onClick={e => e.stopPropagation()}
-            >
-              <ExternalLink className="w-4 h-4" />
-            </a>
           </h3>
-          <p className="text-gray-400 text-xs font-mono">
-            {market.ticker}
-          </p>
-        </div>
-        <div className="flex items-center space-x-1 ml-2">
-          {hasPriceChange ? (
-            <>
-              {isPositiveChange ? (
-                <TrendingUp className="w-4 h-4 text-green-400" />
-              ) : (
-                <TrendingDown className="w-4 h-4 text-red-400" />
-              )}
-              <span className={`text-sm font-semibold ${
-                isPositiveChange ? 'text-green-400' : 'text-red-400'
-              }`}>
-                {calculatedPriceChange > 0 ? '+' : ''}{formatPercentage(Math.abs(calculatedPriceChange))}
-              </span>
-            </>
-          ) : (
-            <span className="text-gray-400 text-sm">No data</span>
+          
+          {/* Contextual Information */}
+          {contextualInfo && (
+            <div className="mt-3 flex items-start space-x-2">
+              <Star className="w-3 h-3 text-yellow-400 mt-0.5 flex-shrink-0" />
+              <p className="text-gray-300 text-xs leading-relaxed">
+                {contextualInfo}
+              </p>
+            </div>
           )}
         </div>
-      </div>
 
-      <div className="mb-4">
-        <div className="flex justify-between items-center mb-2">
-          <span className="text-gray-400 text-xs">Current Probability</span>
-          <span className="text-white text-lg font-bold">
+        {/* Right Side Data */}
+        <div className="flex items-center space-x-3">
+          {/* Change Indicator */}
+          {hasPriceChange ? (
+            <div className={`flex items-center space-x-1 px-2 py-1 rounded text-xs font-medium ${
+              isPositiveChange 
+                ? 'bg-green-600 text-white' 
+                : 'bg-red-600 text-white'
+            }`}>
+              <span>{changePercentage.toFixed(0)}</span>
+              {isPositiveChange ? (
+                <TrendingUp className="w-3 h-3" />
+              ) : (
+                <TrendingDown className="w-3 h-3" />
+              )}
+            </div>
+          ) : (
+            <div className="px-2 py-1 rounded text-xs font-medium bg-gray-600 text-gray-300">
+              No data
+            </div>
+          )}
+
+          {/* Current Probability */}
+          <div className="text-white font-semibold text-sm">
             {formatPercentage(market.currentProbability)}
-          </span>
-        </div>
-      </div>
+          </div>
 
-      <div className="flex justify-between items-center">
-        <div className="flex items-center space-x-1">
-          <BarChart3 className="w-3 h-3 text-gray-400" />
-          <span className="text-gray-400 text-xs">
-            Volume last 24h: {formatVolume(market.volume24h)}
-          </span>
-        </div>
-        <div className="flex items-center space-x-2">
-          <span className="bg-gray-700 text-gray-300 px-2 py-1 rounded text-xs">
-            {market.category}
-          </span>
-          <span className="text-gray-400 text-xs">
-            {market.status}
-          </span>
+          {/* External Link */}
+          <a
+            href={getKalshiUrl()}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-blue-400 hover:text-blue-300"
+            title="View on Kalshi"
+            onClick={e => e.stopPropagation()}
+          >
+            <ExternalLink className="w-4 h-4" />
+          </a>
         </div>
       </div>
     </div>

@@ -77,7 +77,7 @@ function App() {
                 <BarChart3 className="w-6 h-6 text-white" />
               </div>
               <div>
-                <h1 className="text-2xl font-bold text-white">Kalshi Market Tracker</h1>
+                <h1 className="text-2xl font-bold text-white">Market Tracker</h1>
                 <p className="text-gray-400 text-sm">Discover underreacting prediction markets</p>
               </div>
             </div>
@@ -110,37 +110,6 @@ function App() {
           </div>
         )}
 
-        {/* Stats Overview */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-          <div className="bg-gray-800 rounded-lg p-4 border border-gray-700">
-            <div className="flex items-center justify-between">
-              <div>
-                <div className="text-gray-400 text-sm">Active Markets</div>
-                <div className="text-white text-2xl font-bold">{totalActiveMarkets}</div>
-              </div>
-              <Eye className="w-8 h-8 text-blue-400" />
-            </div>
-          </div>
-          <div className="bg-gray-800 rounded-lg p-4 border border-gray-700">
-            <div className="flex items-center justify-between">
-              <div>
-                <div className="text-gray-400 text-sm">High Volume</div>
-                <div className="text-white text-2xl font-bold">{highVolumeMarkets}</div>
-              </div>
-              <BarChart3 className="w-8 h-8 text-green-400" />
-            </div>
-          </div>
-          <div className="bg-gray-800 rounded-lg p-4 border border-gray-700">
-            <div className="flex items-center justify-between">
-              <div>
-                <div className="text-gray-400 text-sm">Big Movers</div>
-                <div className="text-white text-2xl font-bold">{bigMovers}</div>
-              </div>
-              <TrendingUp className="w-8 h-8 text-orange-400" />
-            </div>
-          </div>
-        </div>
-
         {/* Filters */}
         <FilterBar
           filters={filters}
@@ -150,9 +119,9 @@ function App() {
 
         {/* Market Cards */}
         {loading ? (
-          <div className="grid grid-cols-1 gap-6 mb-6">
+          <div className="grid grid-cols-1 gap-3 mb-6">
             {Array.from({ length: 6 }).map((_, i) => (
-              <div key={i} className="bg-gray-800 rounded-lg p-6 border border-gray-700 animate-pulse">
+              <div key={i} className="bg-gray-800 rounded-lg p-4 border border-gray-700 animate-pulse">
                 <div className="h-4 bg-gray-700 rounded mb-3"></div>
                 <div className="h-3 bg-gray-700 rounded mb-4 w-2/3"></div>
                 <div className="h-10 bg-gray-700 rounded mb-4"></div>
@@ -164,7 +133,7 @@ function App() {
             ))}
           </div>
         ) : (
-          <div className="grid grid-cols-1 gap-6 mb-6">
+          <div className="grid grid-cols-1 gap-3 mb-6">
             {markets.map((market, index) => (
               <div key={market.id} ref={index === markets.length - 1 ? lastElementRef : null}>
                 <MarketCard
@@ -177,7 +146,7 @@ function App() {
             
             {/* Loading more indicator */}
             {loadingMore && (
-              <div className="flex justify-center items-center py-8">
+              <div className="flex justify-center items-center py-6">
                 <div className="flex items-center space-x-2 text-gray-400">
                   <Loader2 className="w-5 h-5 animate-spin" />
                   <span>Loading more markets...</span>
@@ -187,7 +156,7 @@ function App() {
             
             {/* End of results indicator */}
             {!hasMore && markets.length > 0 && (
-              <div className="flex justify-center items-center py-8">
+              <div className="flex justify-center items-center py-6">
                 <div className="text-gray-400 text-sm">
                   No more markets to load
                 </div>
