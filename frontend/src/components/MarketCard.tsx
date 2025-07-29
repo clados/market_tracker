@@ -88,24 +88,10 @@ export const MarketCard: React.FC<MarketCardProps> = ({ market, filters, onSelec
     if (market.category.toLowerCase().includes('politics') || market.category.toLowerCase().includes('election')) {
       return 'bg-purple-800 border-purple-700 hover:bg-purple-750';
     }
-    return 'bg-green-800 border-green-700 hover:bg-green-750';
+    return 'bg-gray-800 border-gray-700 hover:bg-gray-750';
   };
 
-  // Generate contextual information based on market data
-  const getContextualInfo = () => {
-    if (market.volume24h > 10000) {
-      return "High trading volume indicates strong market interest and liquidity.";
-    }
-    if (Math.abs(calculatedPriceChange) > 0.1) {
-      return "Significant price movement detected in recent trading activity.";
-    }
-    if (market.status === 'active' && market.currentProbability > 0.8) {
-      return "Market showing strong consensus toward this outcome.";
-    }
-    return null;
-  };
 
-  const contextualInfo = getContextualInfo();
 
   return (
     <div 
@@ -118,16 +104,6 @@ export const MarketCard: React.FC<MarketCardProps> = ({ market, filters, onSelec
           <h3 className="text-white font-medium text-sm leading-relaxed">
             {market.title}
           </h3>
-          
-          {/* Contextual Information */}
-          {contextualInfo && (
-            <div className="mt-3 flex items-start space-x-2">
-              <Star className="w-3 h-3 text-yellow-400 mt-0.5 flex-shrink-0" />
-              <p className="text-gray-300 text-xs leading-relaxed">
-                {contextualInfo}
-              </p>
-            </div>
-          )}
         </div>
 
         {/* Right Side Data */}
