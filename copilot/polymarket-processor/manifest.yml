@@ -1,0 +1,40 @@
+name: polymarket-processor
+type: Scheduled Job
+
+# Job configuration
+image:
+  build: 
+    dockerfile: ./jobs/polymarket-processor/Dockerfile
+    context: ./jobs/polymarket-processor
+  port: 8080
+
+# Schedule configuration (runs daily at 2 AM)
+on:
+  schedule: "0 2 * * *"
+
+# Environment variables
+variables:
+  ENVIRONMENT: ${COPILOT_ENVIRONMENT_NAME}
+  GAMMA_API_BASE_URL: https://gamma-api.polymarket.com
+  CLOB_API_BASE_URL: https://clob.polymarket.com
+  JOB_INTERVAL_HOURS: 6
+  DB_HOST:
+    from_cfn: ${COPILOT_APPLICATION_NAME}-${COPILOT_ENVIRONMENT_NAME}-marketdbEndpoint
+  DB_PORT: 5432
+  DB_NAME: marketdb
+
+# Resource configuration
+cpu: 512
+memory: 1024
+timeout: 30m
+
+# Network configuration
+network:
+  vpc:
+    security_groups:
+      - from_cfn: ${COPILOT_APPLICATION_NAME}-${COPILOT_ENVIRONMENT_NAME}-marketdbSecurityGroup
+
+# Database secret (same as data-processor)
+secrets:
+  DB_SECRET:
+    secretsmanager: DBSecret-TATa1hxGo91h 
